@@ -17,11 +17,11 @@ import {
   FileText, 
   Settings as SettingsIcon, 
   ExternalLink,
-  Sparkles,
   AlertCircle,
   Loader2,
   Share2,
-  Film
+  Film,
+  Globe2
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
@@ -82,7 +82,10 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchWorkspaceData();
+    const request = window.setTimeout(() => {
+      void fetchWorkspaceData();
+    }, 0);
+    return () => window.clearTimeout(request);
   }, [fetchWorkspaceData]);
 
   const handleSendInvite = async (e: React.FormEvent) => {
@@ -245,6 +248,24 @@ export default function AdminDashboard() {
             <Film style={{ width: '18px', height: '18px' }} />
             Media Library
           </button>
+
+          <Link
+            href="/dashboard/admin/social-accounts"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              color: '#94a3b8',
+              fontWeight: 500,
+              fontSize: '0.92rem',
+              textDecoration: 'none',
+            }}
+          >
+            <Globe2 style={{ width: '18px', height: '18px' }} />
+            Social Accounts
+          </Link>
 
           <button
             onClick={() => setActiveTab('settings')}

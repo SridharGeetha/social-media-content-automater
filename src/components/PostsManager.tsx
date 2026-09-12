@@ -106,7 +106,10 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
   }, [activeTab]);
 
   useEffect(() => {
-    fetchPosts();
+    const request = window.setTimeout(() => {
+      void fetchPosts();
+    }, 0);
+    return () => window.clearTimeout(request);
   }, [fetchPosts]);
 
   // Open Create Modal

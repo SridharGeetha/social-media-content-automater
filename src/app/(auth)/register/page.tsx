@@ -29,24 +29,27 @@ function RegisterFormContent() {
 
   useEffect(() => {
     if (token) {
-      setVerifyingToken(true);
-      fetch(`/api/invitations/verify?token=${encodeURIComponent(token)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.valid) {
-            setInviteDetails(data);
-            setEmail(data.email);
-          } else {
-            setError(data.error || 'Invalid or expired invitation token.');
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          setError('Failed to verify invitation token.');
-        })
-        .finally(() => {
-          setVerifyingToken(false);
-        });
+      const request = window.setTimeout(() => {
+        setVerifyingToken(true);
+        fetch(`/api/invitations/verify?token=${encodeURIComponent(token)}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.valid) {
+              setInviteDetails(data);
+              setEmail(data.email);
+            } else {
+              setError(data.error || 'Invalid or expired invitation token.');
+            }
+          })
+          .catch((err) => {
+            console.error(err);
+            setError('Failed to verify invitation token.');
+          })
+          .finally(() => {
+            setVerifyingToken(false);
+          });
+      }, 0);
+      return () => window.clearTimeout(request);
     }
   }, [token]);
 

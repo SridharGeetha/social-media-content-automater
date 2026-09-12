@@ -77,7 +77,8 @@ export default function MediaLibrary({
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>(selectedMediaIds);
 
   useEffect(() => {
-    setLocalSelectedIds(selectedMediaIds);
+    const sync = window.setTimeout(() => setLocalSelectedIds(selectedMediaIds), 0);
+    return () => window.clearTimeout(sync);
   }, [selectedMediaIds]);
 
   const fetchMedia = useCallback(async () => {
@@ -101,7 +102,10 @@ export default function MediaLibrary({
   }, [filterType]);
 
   useEffect(() => {
-    fetchMedia();
+    const request = window.setTimeout(() => {
+      void fetchMedia();
+    }, 0);
+    return () => window.clearTimeout(request);
   }, [fetchMedia]);
 
   // Client-Side File Validation

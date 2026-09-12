@@ -80,7 +80,25 @@ Create Post ──> Add Image / Video ──> Upload to Cloudinary ──> Cloud
    CLOUDINARY_CLOUD_NAME=your_cloud_name
    CLOUDINARY_API_KEY=your_api_key
    CLOUDINARY_API_SECRET=your_api_secret
+
+    LINKEDIN_CLIENT_ID=your_linkedin_client_id
+    LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
+    LINKEDIN_REDIRECT_URI=http://localhost:3000/api/social/linkedin/callback
+    SOCIAL_TOKEN_ENCRYPTION_KEY=base64_encoded_32_byte_key
    ```
+
+  ## Phase 8 — LinkedIn Account Connection
+
+  Workspace Admins can connect or disconnect one LinkedIn account from **Admin Dashboard > Social Accounts**. The OAuth flow requests `openid profile email w_member_social`, validates a signed, short-lived OAuth state cookie, and stores the connection against the active workspace. Access tokens are encrypted with AES-256-GCM using `SOCIAL_TOKEN_ENCRYPTION_KEY` and are never returned to the browser or logged.
+
+  Available endpoints:
+
+  - `GET /api/social/linkedin/connect`: Admin-only OAuth start.
+  - `GET /api/social/linkedin/callback`: OAuth callback and workspace-scoped connection upsert.
+  - `GET /api/social/linkedin`: Admin-only connection status without token data.
+  - `DELETE /api/social/linkedin`: Admin-only disconnect.
+
+  LinkedIn publishing and scheduling are intentionally outside this phase.
 
 ---
 
