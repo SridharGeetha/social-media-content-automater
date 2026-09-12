@@ -82,6 +82,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
   });
   const [attachedMedia, setAttachedMedia] = useState<MediaItem[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [publishingPostId, setPublishingPostId] = useState<string | null>(null);
 
   // Fetch Posts
   const fetchPosts = useCallback(async () => {
@@ -145,7 +146,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
   };
 
   // Handle Submit (Create / Edit)
-  const handleSubmitPost = async (e: React.FormEvent, forceStatus?: PostStatus) => {
+  const handleSubmitPost = async (e: React.FormEvent, forceStatus?: PostStatus, publishToLinkedIn = false) => {
     e.preventDefault();
     if (!formData.content.trim()) return;
 
@@ -181,6 +182,11 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
       const data = await res.json();
 
       if (res.ok) {
+        if (publishToLinkedIn) {
+          const publishResponse = await fetch(`/api/posts/${data.post.id}/linkedin`, { method: 'POST' });
+          const publishData = await publishResponse.json();
+          if (!publishResponse.ok) throw new Error(publishData.error || 'Failed to publish post to LinkedIn.');
+        }
         setShowCreateModal(false);
         setEditingPost(null);
         setAttachedMedia([]);
@@ -213,6 +219,21 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
       setErrorMsg('Error deleting post.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePublishToLinkedIn = async (post: PostItem) => {
+    setPublishingPostId(post.id);
+    setErrorMsg(null);
+    try {
+      const response = await fetch(`/api/posts/${post.id}/linkedin`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to publish post to LinkedIn.');
+      await fetchPosts();
+    } catch (reason: unknown) {
+      setErrorMsg(reason instanceof Error ? reason.message : 'Failed to publish post to LinkedIn.');
+    } finally {
+      setPublishingPostId(null);
     }
   };
 
@@ -451,6 +472,18 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
                           {isOwnerOrManage && (
                             <>
+                              {post.status !== 'PUBLISHED' && (userRole === 'ADMIN' || userRole === 'CREATOR') && (
+                                <button
+                                  onClick={() => handlePublishToLinkedIn(post)}
+                                  disabled={publishingPostId === post.id}
+                                  title="Publish to LinkedIn"
+                                  className="btn-primary"
+                                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                >
+                                  {publishingPostId === post.id ? <Loader2 className="animate-spin" style={{ width: '14px', height: '14px' }} /> : <Send style={{ width: '14px', height: '14px' }} />}
+                                  Publish to LinkedIn
+                                </button>
+                              )}
                               <button
                                 onClick={() => openEditModal(post)}
                                 title="Edit Post"
@@ -640,6 +673,16 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                   ) : (
                     'Publish / Schedule Post'
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmitPost(e, editingPost ? formData.status : 'DRAFT', true)}
+                  disabled={submitting}
+                  className="btn-primary"
+                >
+                  {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
+                  Publish to LinkedIn
                 </button>
               </div>
             </form>

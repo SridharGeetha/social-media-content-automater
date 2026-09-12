@@ -1,6 +1,7 @@
 const LINKEDIN_AUTHORIZE_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
+const LINKEDIN_POSTS_URL = 'https://api.linkedin.com/rest/posts';
 const LINKEDIN_SCOPE = 'openid profile email w_member_social';
 
 interface LinkedInTokenResponse {
@@ -79,4 +80,32 @@ export async function fetchLinkedInProfile(accessToken: string): Promise<LinkedI
     throw new Error('LinkedIn profile response was incomplete.');
   }
   return profile;
+}
+
+export async function publishLinkedInTextPost(accessToken: string, memberId: string, commentary: string): Promise<string> {
+  const response = await fetch(LINKEDIN_POSTS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0',
+      'LinkedIn-Version': process.env.LINKEDIN_API_VERSION || '202601',
+    },
+    body: JSON.stringify({
+      author: `urn:li:person:${memberId}`,
+      commentary,
+      visibility: 'PUBLIC',
+      distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
+      lifecycleState: 'PUBLISHED',
+    }),
+  });
+
+  if (!response.ok) {
+    const details = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(details?.message || `LinkedIn publish failed with status ${response.status}.`);
+  }
+
+  const postId = response.headers.get('x-restli-id') || response.headers.get('x-linkedin-id');
+  if (!postId) throw new Error('LinkedIn publish succeeded but returned no post ID.');
+  return postId;
 }
