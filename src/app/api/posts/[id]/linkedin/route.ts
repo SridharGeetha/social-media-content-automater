@@ -3,9 +3,7 @@ import { auth } from '@/auth';
 import connectToDatabase from '@/lib/db';
 import Post from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
-import SocialAccount from '@/models/SocialAccount';
-import { decryptSocialToken } from '@/lib/social';
-import { publishLinkedInTextPost } from '@/lib/linkedin';
+import { publishPostToLinkedIn } from '@/lib/linkedin-publishing';
 
 export async function POST(
   _req: Request,
@@ -33,25 +31,8 @@ export async function POST(
       return NextResponse.json({ error: 'This post has already been published to LinkedIn.' }, { status: 409 });
     }
 
-    const account = await SocialAccount.findOne({ workspaceId: membership.workspaceId, platform: 'LINKEDIN' })
-      .select('+encryptedAccessToken');
-    if (!account || account.status !== 'CONNECTED') {
-      return NextResponse.json({ error: 'No connected LinkedIn account was found for this workspace.' }, { status: 400 });
-    }
-    if (account.expiresAt <= new Date()) {
-      return NextResponse.json({ error: 'The LinkedIn access token has expired. Reconnect LinkedIn first.' }, { status: 400 });
-    }
-
-    const postId = await publishLinkedInTextPost(
-      decryptSocialToken(account.encryptedAccessToken),
-      account.accountId,
-      post.content
-    );
-    const publishedAt = new Date();
-    post.status = 'PUBLISHED';
-    post.publishedAt = publishedAt;
-    post.publishing = { platform: 'LINKEDIN', externalPostId: postId, publishedAt };
-    await post.save();
+    const postId = await publishPostToLinkedIn(post);
+    const publishedAt = post.publishedAt || new Date();
 
     return NextResponse.json({ message: 'Post published to LinkedIn.', postId, publishedAt: publishedAt.toISOString() });
   } catch (error: unknown) {

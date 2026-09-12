@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
             }
           : null,
         content: post.content,
+        platform: post.platform,
         mediaIds: rawMediaIds,
         media: mediaList,
         status: post.status,
@@ -129,10 +130,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { content, mediaIds, status, scheduledAt } = body;
+    const { content, platform = 'LINKEDIN', mediaIds, status, scheduledAt } = body;
 
     if (!content || typeof content !== 'string' || !content.trim()) {
       return NextResponse.json({ error: 'Post content is required.' }, { status: 400 });
+    }
+    if (platform !== 'LINKEDIN') {
+      return NextResponse.json({ error: 'Only LinkedIn publishing is currently supported.' }, { status: 400 });
     }
 
     // Workspace Isolation Check for Attached Media:
@@ -173,6 +177,7 @@ export async function POST(req: NextRequest) {
       workspaceId: currentMember.workspaceId,
       createdBy: userId,
       content: content.trim(),
+      platform,
       mediaIds: cleanMediaIds,
       status: postStatus,
       scheduledAt: parsedScheduledAt,
@@ -227,6 +232,7 @@ export async function POST(req: NextRequest) {
               }
             : null,
           content: newPost.content,
+          platform: newPost.platform,
           mediaIds: cleanMediaIds,
           media: mediaList,
           status: newPost.status,

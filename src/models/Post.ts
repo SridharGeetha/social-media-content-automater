@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export type PostStatus = 'DRAFT' | 'SCHEDULED' | 'QUEUED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
+export type PostPlatform = 'LINKEDIN';
 
 export interface IPostPublishing {
   platform: 'LINKEDIN';
@@ -14,6 +15,7 @@ export interface IPost extends Document {
   workspaceId: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
   content: string;
+  platform: PostPlatform;
   mediaIds: string[];
   status: PostStatus;
   scheduledAt?: Date | null;
@@ -28,6 +30,7 @@ const PostSchema: Schema<IPost> = new Schema(
     workspaceId: { type: Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     content: { type: String, required: true, trim: true },
+    platform: { type: String, enum: ['LINKEDIN'], required: true, default: 'LINKEDIN' },
     mediaIds: [{ type: Schema.Types.ObjectId, ref: 'Media' }],
     status: {
       type: String,

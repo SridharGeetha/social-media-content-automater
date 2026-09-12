@@ -37,6 +37,7 @@ export interface PostItem {
     image?: string;
   } | null;
   content: string;
+  platform: 'LINKEDIN';
   mediaIds: string[];
   media?: MediaItem[];
   status: PostStatus;
@@ -77,6 +78,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
   // Form Fields
   const [formData, setFormData] = useState({
     content: '',
+    platform: 'LINKEDIN' as const,
     status: 'DRAFT' as PostStatus,
     scheduledAt: '',
   });
@@ -117,6 +119,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
   const openCreateModal = (defaultStatus: PostStatus = 'DRAFT') => {
     setFormData({
       content: '',
+      platform: 'LINKEDIN',
       status: defaultStatus,
       scheduledAt: '',
     });
@@ -138,6 +141,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
     setFormData({
       content: post.content,
+      platform: post.platform || 'LINKEDIN',
       status: post.status,
       scheduledAt: schedDate,
     });
@@ -158,6 +162,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
     const payload = {
       content: formData.content.trim(),
+      platform: formData.platform,
       mediaIds: mediaIdsArray,
       status: targetStatus,
       scheduledAt: formData.scheduledAt ? new Date(formData.scheduledAt).toISOString() : null,
@@ -539,6 +544,18 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                   className="input-field"
                   style={{ resize: 'vertical' }}
                 />
+              </div>
+
+              <div>
+                <label className="input-label">Publish To</label>
+                <select
+                  value={formData.platform}
+                  onChange={(e) => setFormData({ ...formData, platform: e.target.value as 'LINKEDIN' })}
+                  className="input-field"
+                  style={{ backgroundColor: '#0f172a' }}
+                >
+                  <option value="LINKEDIN">LinkedIn</option>
+                </select>
               </div>
 
               {/* ATTACH MEDIA SECTION */}
