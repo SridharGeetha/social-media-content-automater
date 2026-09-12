@@ -20,8 +20,12 @@ import {
   Sparkles,
   AlertCircle,
   Loader2,
-  Share2
+  Share2,
+  Film
 } from 'lucide-react';
+import PostsManager from '@/components/PostsManager';
+import MediaLibrary from '@/components/MediaLibrary';
+
 
 interface Member {
   id: string;
@@ -44,7 +48,7 @@ interface Invitation {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'content' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'content' | 'media' | 'settings'>('overview');
   const [workspace, setWorkspace] = useState<{ id: string; name: string; slug: string } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -222,6 +226,27 @@ export default function AdminDashboard() {
           </button>
 
           <button
+            onClick={() => setActiveTab('media')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeTab === 'media' ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+              color: activeTab === 'media' ? '#818cf8' : '#94a3b8',
+              fontWeight: activeTab === 'media' ? 700 : 500,
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <Film style={{ width: '18px', height: '18px' }} />
+            Media Library
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             style={{
               display: 'flex',
@@ -265,6 +290,7 @@ export default function AdminDashboard() {
               {activeTab === 'overview' && 'Workspace Overview'}
               {activeTab === 'members' && 'Team Members & Role Invitations'}
               {activeTab === 'content' && 'Content Overview'}
+              {activeTab === 'media' && 'Media Assets Library'}
               {activeTab === 'settings' && 'Workspace Settings'}
             </h1>
             <p style={{ color: '#94a3b8', fontSize: '0.92rem', marginTop: '4px' }}>
@@ -526,22 +552,15 @@ export default function AdminDashboard() {
 
             {/* CONTENT TAB */}
             {activeTab === 'content' && (
-              <div className="glass-panel animate-fade-in" style={{ padding: '36px' }}>
-                <h3 style={{ fontSize: '1.3rem', color: '#f8fafc', marginBottom: '12px' }}>Workspace Content Management</h3>
-                <p style={{ color: '#94a3b8', fontSize: '0.92rem', marginBottom: '24px' }}>
-                  Admin overview of scheduled content campaigns, manager approvals, and creator submissions.
-                </p>
+              <div className="animate-fade-in">
+                <PostsManager userRole="ADMIN" />
+              </div>
+            )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                  <div style={{ background: 'rgba(15,23,42,0.6)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <h4 style={{ color: '#f8fafc', marginBottom: '8px' }}>Draft Posts in Review</h4>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Submitted by Creators, awaiting Manager approval.</p>
-                  </div>
-                  <div style={{ background: 'rgba(15,23,42,0.6)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <h4 style={{ color: '#f8fafc', marginBottom: '8px' }}>Scheduled Queue</h4>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Approved campaigns queued for automated publishing.</p>
-                  </div>
-                </div>
+            {/* MEDIA TAB */}
+            {activeTab === 'media' && (
+              <div className="animate-fade-in">
+                <MediaLibrary userRole="ADMIN" />
               </div>
             )}
 

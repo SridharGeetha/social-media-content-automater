@@ -12,8 +12,11 @@ import {
   Clock, 
   CheckCircle2,
   Sparkles,
-  Share2
+  Share2,
+  Film
 } from 'lucide-react';
+import PostsManager from '@/components/PostsManager';
+import MediaLibrary from '@/components/MediaLibrary';
 
 export default function CreatorDashboard() {
   const { data: session } = useSession();
@@ -156,8 +159,8 @@ export default function CreatorDashboard() {
               textAlign: 'left',
             }}
           >
-            <ImageIcon style={{ width: '18px', height: '18px' }} />
-            Asset Library
+            <Film style={{ width: '18px', height: '18px' }} />
+            Media Library
           </button>
         </nav>
 
@@ -188,66 +191,10 @@ export default function CreatorDashboard() {
           </button>
         </div>
 
-        {/* MY DRAFTS TAB */}
+        {/* MY DRAFTS & POSTS TAB */}
         {activeTab === 'drafts' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>TOTAL DRAFTS</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>{drafts.length}</div>
-              </div>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>UNDER MANAGER REVIEW</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#fbbf24', marginTop: '4px' }}>
-                  {drafts.filter((d) => d.status === 'UNDER_REVIEW').length}
-                </div>
-              </div>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>PUBLISHED THIS MONTH</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#818cf8', marginTop: '4px' }}>8</div>
-              </div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '1.2rem', color: '#f8fafc', marginBottom: '16px' }}>My Content Drafts</h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {drafts.map((draft) => (
-                  <div
-                    key={draft.id}
-                    style={{
-                      padding: '18px 20px',
-                      borderRadius: '12px',
-                      background: 'rgba(15, 23, 42, 0.6)',
-                      border: '1px solid rgba(255, 255, 255, 0.05)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc' }}>{draft.title}</div>
-                      <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '4px', display: 'flex', gap: '16px' }}>
-                        <span>Target: <strong style={{ color: '#34d399' }}>{draft.platform}</strong></span>
-                        <span>Updated: {draft.updatedAt}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      {draft.status === 'UNDER_REVIEW' ? (
-                        <span className="role-badge status-pending" style={{ fontSize: '0.72rem' }}>
-                          <Clock style={{ width: '12px', height: '12px', marginRight: '4px' }} /> Sent to Manager
-                        </span>
-                      ) : (
-                        <span className="role-badge role-creator" style={{ fontSize: '0.72rem' }}>
-                          DRAFT
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="animate-fade-in">
+            <PostsManager userRole="CREATOR" currentUserId={session?.user?.id} />
           </div>
         )}
 
@@ -333,12 +280,8 @@ export default function CreatorDashboard() {
 
         {/* ASSET LIBRARY TAB */}
         {activeTab === 'assets' && (
-          <div className="glass-panel animate-fade-in" style={{ padding: '36px', textAlign: 'center' }}>
-            <ImageIcon style={{ width: '36px', height: '36px', color: '#34d399', margin: '0 auto 12px auto' }} />
-            <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', marginBottom: '6px' }}>Media Asset Library</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-              Upload graphics, video clips, and templates for social media campaigns.
-            </p>
+          <div className="animate-fade-in">
+            <MediaLibrary userRole="CREATOR" currentUserId={session?.user?.id} />
           </div>
         )}
       </main>

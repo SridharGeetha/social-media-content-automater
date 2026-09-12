@@ -13,12 +13,15 @@ import {
   ThumbsUp, 
   ThumbsDown,
   Layers,
-  Share2
+  Share2,
+  Film
 } from 'lucide-react';
+import PostsManager from '@/components/PostsManager';
+import MediaLibrary from '@/components/MediaLibrary';
 
 export default function ManagerDashboard() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'queue' | 'calendar' | 'activity'>('queue');
+  const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'queue' | 'calendar' | 'activity'>('posts');
 
   // Simulated content review items for Manager Phase 1 UI
   const [reviewItems, setReviewItems] = useState([
@@ -74,6 +77,50 @@ export default function ManagerDashboard() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
           <button
+            onClick={() => setActiveTab('posts')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeTab === 'posts' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+              color: activeTab === 'posts' ? '#22d3ee' : '#94a3b8',
+              fontWeight: activeTab === 'posts' ? 700 : 500,
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <FileText style={{ width: '18px', height: '18px' }} />
+              All Workspace Posts
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('media')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeTab === 'media' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+              color: activeTab === 'media' ? '#22d3ee' : '#94a3b8',
+              fontWeight: activeTab === 'media' ? 700 : 500,
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Film style={{ width: '18px', height: '18px' }} />
+              Media Library
+            </div>
+          </button>
+
+          <button
             onClick={() => setActiveTab('queue')}
             style={{
               display: 'flex',
@@ -90,7 +137,7 @@ export default function ManagerDashboard() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FileText style={{ width: '18px', height: '18px' }} />
+              <Layers style={{ width: '18px', height: '18px' }} />
               Content Review Queue
             </div>
             {reviewItems.length > 0 && (
@@ -166,6 +213,20 @@ export default function ManagerDashboard() {
           </div>
           <span className="role-badge role-manager">Active Role: MANAGER</span>
         </div>
+
+        {/* Live Posts Management Tab */}
+        {activeTab === 'posts' && (
+          <div className="animate-fade-in">
+            <PostsManager userRole="MANAGER" />
+          </div>
+        )}
+
+        {/* Media Library Tab */}
+        {activeTab === 'media' && (
+          <div className="animate-fade-in">
+            <MediaLibrary userRole="MANAGER" />
+          </div>
+        )}
 
         {/* Content Review Queue */}
         {activeTab === 'queue' && (
@@ -244,7 +305,7 @@ export default function ManagerDashboard() {
           </div>
         )}
 
-        {activeTab !== 'queue' && (
+        {(activeTab === 'calendar' || activeTab === 'activity') && (
           <div className="glass-panel animate-fade-in" style={{ padding: '36px', textAlign: 'center' }}>
             <Clock style={{ width: '32px', height: '32px', color: '#22d3ee', margin: '0 auto 12px auto' }} />
             <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', marginBottom: '6px' }}>Section Ready for Phase 2</h3>

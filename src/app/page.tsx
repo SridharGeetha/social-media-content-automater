@@ -29,9 +29,10 @@ export default async function LandingPage() {
           position: 'sticky',
           top: 0,
           zIndex: 50,
-          backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'rgba(9, 13, 22, 0.8)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
         }}
       >
         <div
@@ -45,22 +46,8 @@ export default async function LandingPage() {
           }}
         >
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
-              }}
-            >
-              <Share2 style={{ width: '22px', height: '22px', color: '#fff' }} />
-            </div>
-            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-              Social<span style={{ color: '#818cf8' }}>Automater</span>
+            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+              Social<span style={{ color: '#22c55e' }}>Automater</span>
             </span>
           </Link>
 
@@ -107,32 +94,15 @@ export default async function LandingPage() {
         }}
         className="animate-fade-in"
       >
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 16px',
-            borderRadius: '9999px',
-            background: 'rgba(99, 102, 241, 0.12)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            color: '#a5b4fc',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            marginBottom: '24px',
-          }}
-        >
-          <Sparkles style={{ width: '15px', height: '15px', color: '#818cf8' }} />
-          Phase 1 Release: Next.js + Auth.js Multi-Role Workspace Platform
-        </div>
-
         <h1
           style={{
-            fontSize: 'clamp(2.5rem, 5vw, 4.2rem)',
-            fontWeight: 800,
-            lineHeight: 1.1,
+            fontSize: 'clamp(2rem, 3vw, 3rem)',
+            fontWeight: 700,
+            lineHeight: 1.2,
             marginBottom: '20px',
             color: '#f8fafc',
+            maxWidth: '900px',
+            margin: '0 auto 20px auto'
           }}
         >
           Automate Social Media Operations with <br />
