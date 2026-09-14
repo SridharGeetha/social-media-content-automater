@@ -90,7 +90,6 @@ export async function GET(
             }
           : null,
         content: post.content,
-        platform: post.platform,
         mediaIds: rawMediaIds,
         media: mediaList,
         status: post.status,
@@ -139,20 +138,13 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { content, platform, mediaIds, status, scheduledAt, publishedAt } = body;
+    const { content, mediaIds, status, scheduledAt, publishedAt } = body;
 
     if (content !== undefined) {
       if (typeof content !== 'string' || !content.trim()) {
         return NextResponse.json({ error: 'Content cannot be empty.' }, { status: 400 });
       }
       post.content = content.trim();
-    }
-
-    if (platform !== undefined) {
-      if (platform !== 'LINKEDIN') {
-        return NextResponse.json({ error: 'Only LinkedIn publishing is currently supported.' }, { status: 400 });
-      }
-      post.platform = platform;
     }
 
     if (Array.isArray(mediaIds)) {
@@ -263,7 +255,6 @@ export async function PATCH(
             }
           : null,
         content: post.content,
-        platform: post.platform,
         mediaIds: rawMediaIds,
         media: mediaList,
         status: post.status,
