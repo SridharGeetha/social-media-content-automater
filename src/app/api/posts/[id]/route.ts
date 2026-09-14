@@ -5,6 +5,7 @@ import Post, { PostStatus } from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
 import User from '@/models/User';
 import Media from '@/models/Media';
+import { scheduleLinkedInPost } from '@/lib/qstash';
 
 const VALID_STATUSES: PostStatus[] = ['DRAFT', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
@@ -139,6 +140,7 @@ export async function PATCH(
 
     const body = await req.json();
     const { content, mediaIds, status, scheduledAt, publishedAt } = body;
+    const shouldSchedule = status?.toUpperCase() === 'SCHEDULED' || scheduledAt !== undefined;
 
     if (content !== undefined) {
       if (typeof content !== 'string' || !content.trim()) {
@@ -188,6 +190,10 @@ export async function PATCH(
       }
     }
 
+    if (post.status === 'SCHEDULED' && (!post.scheduledAt || post.scheduledAt.getTime() <= Date.now())) {
+      return NextResponse.json({ error: 'A scheduled post must have a future scheduledAt value.' }, { status: 400 });
+    }
+
     if (publishedAt !== undefined) {
       if (publishedAt === null) {
         post.publishedAt = null;
@@ -200,6 +206,20 @@ export async function PATCH(
     }
 
     await post.save();
+
+    if (shouldSchedule && post.status === 'SCHEDULED' && post.scheduledAt) {
+      try {
+        await scheduleLinkedInPost(post._id.toString(), post.scheduledAt);
+      } catch (error) {
+        post.status = 'FAILED';
+        post.publishing = {
+          platform: 'LINKEDIN',
+          error: error instanceof Error ? error.message : 'Failed to schedule post.',
+        };
+        await post.save();
+        return NextResponse.json({ error: 'Post was updated but could not be scheduled.' }, { status: 502 });
+      }
+    }
 
     const updatedPost = await Post.findById(post._id)
       .populate({
