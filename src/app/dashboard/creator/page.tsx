@@ -12,8 +12,8 @@ import {
   Clock, 
   CheckCircle2,
   Sparkles,
-  Share2,
-  Film
+  Film,
+  UserCircle
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
@@ -70,11 +70,11 @@ export default function CreatorDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#090d16' }}>
       {/* Creator Sidebar Navigation */}
-      <aside
+      <aside className="dashboard-sidebar"
         style={{
           width: '260px',
-          borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'rgba(15, 23, 42, 0.7)',
+          borderRight: '1px solid rgba(231, 225, 177, 0.42)',
+          background: 'linear-gradient(180deg, #041A05 0%, #08310C 25%, #0B3D12 100%)',
           backdropFilter: 'blur(16px)',
           display: 'flex',
           flexDirection: 'column',
@@ -82,9 +82,6 @@ export default function CreatorDashboard() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 8px 24px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', marginBottom: '24px' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Share2 style={{ width: '20px', height: '20px', color: '#fff' }} />
-          </div>
           <div>
             <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
               Creator Studio
@@ -105,8 +102,8 @@ export default function CreatorDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'drafts' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
-              color: activeTab === 'drafts' ? '#34d399' : '#94a3b8',
+              background: activeTab === 'drafts' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'drafts' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'drafts' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -116,7 +113,7 @@ export default function CreatorDashboard() {
               <FileText style={{ width: '18px', height: '18px' }} />
               My Content Drafts
             </div>
-            <span style={{ fontSize: '0.75rem', background: '#10b981', padding: '2px 8px', borderRadius: '9999px', color: '#000', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.25)', padding: '2px 8px', borderRadius: '9999px', color: '#ffffff', fontWeight: 700 }}>
               {drafts.length}
             </span>
           </button>
@@ -130,8 +127,8 @@ export default function CreatorDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'new' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
-              color: activeTab === 'new' ? '#34d399' : '#94a3b8',
+              background: activeTab === 'new' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'new' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'new' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -151,8 +148,8 @@ export default function CreatorDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'assets' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
-              color: activeTab === 'assets' ? '#34d399' : '#94a3b8',
+              background: activeTab === 'assets' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'assets' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'assets' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -165,11 +162,16 @@ export default function CreatorDashboard() {
         </nav>
 
         <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <div style={{ padding: '8px 12px', marginBottom: '12px' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>{session?.user?.name || 'Creator'}</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{session?.user?.email}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px 14px' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+              <UserCircle style={{ width: '21px', height: '21px' }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.user?.name || 'Creator'}</div>
+              <div style={{ fontSize: '0.72rem', color: '#e6f8e2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.user?.email || 'Creator account'}</div>
+            </div>
           </div>
-          <button onClick={() => signOut({ callbackUrl: '/login' })} className="btn-secondary" style={{ width: '100%', padding: '10px', fontSize: '0.85rem' }}>
+          <button onClick={() => signOut({ callbackUrl: '/login' })} className="btn-secondary" style={{ width: '100%', padding: '10px', fontSize: '0.85rem', color: '#fecaca', borderColor: 'rgba(248, 113, 113, 0.5)' }}>
             <LogOut style={{ width: '16px', height: '16px' }} />
             Sign Out
           </button>
@@ -177,15 +179,15 @@ export default function CreatorDashboard() {
       </aside>
 
       {/* Main Studio Area */}
-      <main style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+      <main className="dashboard-main-content" style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
+        <div className="dashboard-top-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f8fafc' }}>Creator Content Studio</h1>
-            <p style={{ color: '#94a3b8', fontSize: '0.92rem', marginTop: '4px' }}>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0D530E' }}>Creator Content Studio</h1>
+            <p style={{ color: '#306D29', fontSize: '0.92rem', marginTop: '4px' }}>
               Draft engaging social posts, submit for Manager approval, and upload media assets.
             </p>
           </div>
-          <button onClick={() => setActiveTab('new')} className="btn-primary" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+          <button onClick={() => setActiveTab('new')} className="btn-primary" style={{ background: 'linear-gradient(135deg, #A5D86A 0%, #4F912A 100%)', color: '#10210d' }}>
             <Sparkles style={{ width: '18px', height: '18px' }} />
             + New Post Draft
           </button>

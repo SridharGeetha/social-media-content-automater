@@ -13,8 +13,8 @@ import {
   ThumbsUp, 
   ThumbsDown,
   Layers,
-  Share2,
-  Film
+  Film,
+  UserCircle
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
@@ -50,11 +50,11 @@ export default function ManagerDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#090d16' }}>
       {/* Manager Sidebar Navigation */}
-      <aside
+      <aside className="dashboard-sidebar"
         style={{
           width: '260px',
-          borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'rgba(15, 23, 42, 0.7)',
+          borderRight: '1px solid rgba(231, 225, 177, 0.42)',
+          background: 'linear-gradient(180deg, #041A05 0%, #08310C 25%, #0B3D12 100%)',
           backdropFilter: 'blur(16px)',
           display: 'flex',
           flexDirection: 'column',
@@ -62,9 +62,6 @@ export default function ManagerDashboard() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 8px 24px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', marginBottom: '24px' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Share2 style={{ width: '20px', height: '20px', color: '#fff' }} />
-          </div>
           <div>
             <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
               Manager Studio
@@ -85,8 +82,8 @@ export default function ManagerDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'posts' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-              color: activeTab === 'posts' ? '#22d3ee' : '#94a3b8',
+              background: activeTab === 'posts' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'posts' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'posts' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -107,8 +104,8 @@ export default function ManagerDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'media' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-              color: activeTab === 'media' ? '#22d3ee' : '#94a3b8',
+              background: activeTab === 'media' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'media' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'media' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -129,8 +126,8 @@ export default function ManagerDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'queue' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-              color: activeTab === 'queue' ? '#22d3ee' : '#94a3b8',
+              background: activeTab === 'queue' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'queue' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'queue' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -141,7 +138,7 @@ export default function ManagerDashboard() {
               Content Review Queue
             </div>
             {reviewItems.length > 0 && (
-              <span style={{ fontSize: '0.75rem', background: '#06b6d4', padding: '2px 8px', borderRadius: '9999px', color: '#000', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.25)', padding: '2px 8px', borderRadius: '9999px', color: '#ffffff', fontWeight: 700 }}>
                 {reviewItems.length}
               </span>
             )}
@@ -156,8 +153,8 @@ export default function ManagerDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'calendar' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-              color: activeTab === 'calendar' ? '#22d3ee' : '#94a3b8',
+              background: activeTab === 'calendar' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'calendar' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'calendar' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -177,8 +174,8 @@ export default function ManagerDashboard() {
               padding: '12px 14px',
               borderRadius: '10px',
               border: 'none',
-              background: activeTab === 'activity' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-              color: activeTab === 'activity' ? '#22d3ee' : '#94a3b8',
+              background: activeTab === 'activity' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              color: activeTab === 'activity' ? '#ffffff' : '#e6f8e2',
               fontWeight: activeTab === 'activity' ? 700 : 500,
               fontSize: '0.92rem',
               cursor: 'pointer',
@@ -191,11 +188,16 @@ export default function ManagerDashboard() {
         </nav>
 
         <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <div style={{ padding: '8px 12px', marginBottom: '12px' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>{session?.user?.name || 'Manager'}</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{session?.user?.email}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px 14px' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+              <UserCircle style={{ width: '21px', height: '21px' }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.user?.name || 'Manager'}</div>
+              <div style={{ fontSize: '0.72rem', color: '#e6f8e2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.user?.email || 'Manager account'}</div>
+            </div>
           </div>
-          <button onClick={() => signOut({ callbackUrl: '/login' })} className="btn-secondary" style={{ width: '100%', padding: '10px', fontSize: '0.85rem' }}>
+          <button onClick={() => signOut({ callbackUrl: '/login' })} className="btn-secondary" style={{ width: '100%', padding: '10px', fontSize: '0.85rem', color: '#fecaca', borderColor: 'rgba(248, 113, 113, 0.5)' }}>
             <LogOut style={{ width: '16px', height: '16px' }} />
             Sign Out
           </button>
@@ -203,15 +205,15 @@ export default function ManagerDashboard() {
       </aside>
 
       {/* Main Area */}
-      <main style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+      <main className="dashboard-main-content" style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
+        <div className="dashboard-top-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f8fafc' }}>Manager Strategy & Approvals</h1>
-            <p style={{ color: '#94a3b8', fontSize: '0.92rem', marginTop: '4px' }}>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0D530E' }}>Manager Strategy & Approvals</h1>
+            <p style={{ color: '#306D29', fontSize: '0.92rem', marginTop: '4px' }}>
               Review creator submissions, organize social campaigns, and manage publishing timelines.
             </p>
           </div>
-          <span className="role-badge role-manager">Active Role: MANAGER</span>
+          <span className="role-badge role-manager" style={{ background: 'rgba(48, 109, 41, 0.12)', color: '#0D530E', borderColor: 'rgba(48, 109, 41, 0.3)' }}>Active Role: MANAGER</span>
         </div>
 
         {/* Live Posts Management Tab */}

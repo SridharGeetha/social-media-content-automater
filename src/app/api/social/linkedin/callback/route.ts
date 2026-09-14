@@ -7,7 +7,8 @@ import { encryptSocialToken, canManageSocialAccounts, STATE_COOKIE_NAME, validat
 import { exchangeLinkedInCode, fetchLinkedInProfile } from '@/lib/linkedin';
 
 function redirectToAccounts(req: NextRequest, result: 'connected' | 'error', reason?: string) {
-  const url = new URL('/dashboard/admin/social-accounts', req.url);
+  const url = new URL('/dashboard/admin', req.url);
+  url.searchParams.set('tab', 'social');
   url.searchParams.set(result, '1');
   if (reason) url.searchParams.set('reason', reason.slice(0, 200));
   return NextResponse.redirect(url);

@@ -143,7 +143,7 @@ export default function CreateWorkspacePage() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading} className="btn-primary" style={{ width: '100%', padding: '14px' }}>
+            <button type="submit" disabled={loading} aria-busy={loading} className="btn-primary" style={{ width: '100%', padding: '14px' }}>
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} />

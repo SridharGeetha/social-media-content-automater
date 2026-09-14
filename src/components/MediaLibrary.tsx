@@ -17,6 +17,7 @@ import {
   Maximize2,
   Filter,
 } from 'lucide-react';
+import { CollectionSkeleton } from '@/components/LoadingSkeleton';
 
 export interface MediaItem {
   id: string;
@@ -275,9 +276,10 @@ export default function MediaLibrary({
           className="glass-panel"
           style={{
             padding: '24px',
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, rgba(10, 30, 14, 0.9) 0%, rgba(16, 45, 22, 0.92) 100%)',
+            border: '1px solid rgba(185, 231, 105, 0.2)',
+            boxShadow: '0 14px 35px rgba(17, 40, 21, 0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -286,11 +288,11 @@ export default function MediaLibrary({
           }}
         >
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Film style={{ color: '#818cf8', width: '24px', height: '24px' }} />
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#F9F2DA', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Film style={{ color: '#A5D86A', width: '24px', height: '24px' }} />
               Workspace Media Library
             </h2>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '4px' }}>
+            <p style={{ color: '#C9C19A', fontSize: '0.9rem', marginTop: '4px' }}>
               Securely store and manage Cloudinary media assets isolated for your workspace.
             </p>
           </div>
@@ -299,7 +301,7 @@ export default function MediaLibrary({
             onClick={() => fileInputRef.current?.click()}
             className="btn-primary"
             disabled={uploading}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', fontWeight: 700 }}
           >
             {uploading ? (
               <Loader2 className="animate-spin" style={{ width: '18px', height: '18px' }} />
@@ -381,26 +383,27 @@ export default function MediaLibrary({
         onClick={() => !uploading && fileInputRef.current?.click()}
         style={{
           border: isDragOver
-            ? '2px dashed #818cf8'
-            : '2px dashed rgba(255, 255, 255, 0.15)',
-          borderRadius: '14px',
+            ? '2px dashed #A5D86A'
+            : '2px dashed rgba(185, 231, 105, 0.22)',
+          borderRadius: '16px',
           padding: '28px',
           textAlign: 'center',
-          background: isDragOver ? 'rgba(99, 102, 241, 0.1)' : 'rgba(15, 23, 42, 0.4)',
+          background: isDragOver ? 'rgba(56, 128, 53, 0.12)' : 'rgba(8, 17, 12, 0.7)',
           cursor: uploading ? 'not-allowed' : 'pointer',
           transition: 'all 0.2s ease-in-out',
+          boxShadow: 'inset 0 0 0 1px rgba(185, 231, 105, 0.08)',
         }}
       >
         {uploading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-            <Loader2 className="animate-spin" style={{ width: '32px', height: '32px', color: '#818cf8' }} />
-            <p style={{ color: '#f8fafc', fontWeight: 600, fontSize: '0.95rem' }}>Uploading to Cloudinary...</p>
+            <Loader2 className="animate-spin" style={{ width: '32px', height: '32px', color: '#A5D86A' }} />
+            <p style={{ color: '#F9F2DA', fontWeight: 600, fontSize: '0.95rem' }}>Uploading to Cloudinary...</p>
             <div style={{ width: '200px', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '9999px', overflow: 'hidden' }}>
               <div
                 style={{
                   width: `${uploadProgress}%`,
                   height: '100%',
-                  background: 'linear-gradient(90deg, #6366f1, #818cf8)',
+                  background: 'linear-gradient(90deg, #A5D86A, #4F912A)',
                   transition: 'width 0.3s ease',
                 }}
               />
@@ -408,11 +411,11 @@ export default function MediaLibrary({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <Upload style={{ width: '28px', height: '28px', color: '#818cf8', marginBottom: '4px' }} />
-            <p style={{ color: '#f8fafc', fontWeight: 600, fontSize: '0.95rem' }}>
-              Drag & drop images or videos here, or <span style={{ color: '#818cf8', textDecoration: 'underline' }}>browse</span>
+            <Upload style={{ width: '28px', height: '28px', color: '#A5D86A', marginBottom: '4px' }} />
+            <p style={{ color: '#F9F2DA', fontWeight: 600, fontSize: '0.95rem' }}>
+              Drag & drop images or videos here, or <span style={{ color: '#A5D86A', textDecoration: 'underline' }}>browse</span>
             </p>
-            <p style={{ color: '#64748b', fontSize: '0.8rem' }}>
+            <p style={{ color: '#C9C19A', fontSize: '0.8rem' }}>
               Supported: JPG, PNG, GIF, WEBP (Max 10MB) &bull; MP4, WebM, MOV, AVI (Max 50MB)
             </p>
           </div>
@@ -421,7 +424,7 @@ export default function MediaLibrary({
 
       {/* Filter Tabs & Media Grid */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '4px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <div style={{ display: 'flex', gap: '8px', background: 'rgba(11, 28, 16, 0.75)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(185, 231, 105, 0.16)' }}>
           <button
             onClick={() => setFilterType('all')}
             style={{
@@ -431,8 +434,8 @@ export default function MediaLibrary({
               fontSize: '0.85rem',
               fontWeight: 600,
               cursor: 'pointer',
-              background: filterType === 'all' ? '#6366f1' : 'transparent',
-              color: filterType === 'all' ? '#fff' : '#94a3b8',
+              background: filterType === 'all' ? '#A5D86A' : 'transparent',
+              color: filterType === 'all' ? '#10210d' : '#C9C19A',
             }}
           >
             All Media
@@ -449,8 +452,8 @@ export default function MediaLibrary({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: filterType === 'image' ? '#6366f1' : 'transparent',
-              color: filterType === 'image' ? '#fff' : '#94a3b8',
+              background: filterType === 'image' ? '#A5D86A' : 'transparent',
+              color: filterType === 'image' ? '#10210d' : '#C9C19A',
             }}
           >
             <ImageIcon style={{ width: '14px', height: '14px' }} />
@@ -468,8 +471,8 @@ export default function MediaLibrary({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: filterType === 'video' ? '#6366f1' : 'transparent',
-              color: filterType === 'video' ? '#fff' : '#94a3b8',
+              background: filterType === 'video' ? '#A5D86A' : 'transparent',
+              color: filterType === 'video' ? '#10210d' : '#C9C19A',
             }}
           >
             <Film style={{ width: '14px', height: '14px' }} />
@@ -477,17 +480,14 @@ export default function MediaLibrary({
           </button>
         </div>
 
-        <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>
+        <div style={{ color: '#C9C19A', fontSize: '0.85rem', fontWeight: 500 }}>
           {mediaList.length} asset{mediaList.length === 1 ? '' : 's'} total
         </div>
       </div>
 
       {/* Media Grid */}
       {loading ? (
-        <div className="glass-panel" style={{ padding: '60px', textAlign: 'center', borderRadius: '16px' }}>
-          <Loader2 className="animate-spin" style={{ width: '32px', height: '32px', color: '#818cf8', margin: '0 auto 16px auto' }} />
-          <p style={{ color: '#94a3b8' }}>Loading workspace media library...</p>
-        </div>
+        <CollectionSkeleton rows={6} />
       ) : mediaList.length === 0 ? (
         <div className="glass-panel" style={{ padding: '60px', textAlign: 'center', borderRadius: '16px' }}>
           <ImageIcon style={{ width: '48px', height: '48px', color: '#475569', margin: '0 auto 16px auto' }} />
@@ -517,11 +517,11 @@ export default function MediaLibrary({
                   position: 'relative',
                   borderRadius: '14px',
                   overflow: 'hidden',
-                  background: 'rgba(15, 23, 42, 0.7)',
+                  background: 'linear-gradient(180deg, rgba(8, 17, 12, 0.84) 0%, rgba(15, 29, 18, 0.9) 100%)',
                   border: isSelected
-                    ? '2px solid #818cf8'
-                    : '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: isSelected ? '0 0 12px rgba(99, 102, 241, 0.4)' : 'none',
+                    ? '2px solid #A5D86A'
+                    : '1px solid rgba(185, 231, 105, 0.14)',
+                  boxShadow: isSelected ? '0 0 18px rgba(165, 216, 106, 0.18)' : '0 10px 24px rgba(9, 15, 11, 0.24)',
                   cursor: selectable ? 'pointer' : 'default',
                   transition: 'all 0.2s ease',
                   display: 'flex',
@@ -529,7 +529,7 @@ export default function MediaLibrary({
                 }}
               >
                 {/* Media Preview Box */}
-                <div style={{ position: 'relative', width: '100%', height: '150px', background: '#020617', overflow: 'hidden' }}>
+                <div style={{ position: 'relative', width: '100%', height: '150px', background: '#020b06', overflow: 'hidden' }}>
                   {item.type === 'image' ? (
                     <img
                       src={item.secureUrl || item.cloudinaryUrl}
@@ -566,9 +566,9 @@ export default function MediaLibrary({
                       left: '8px',
                       padding: '3px 8px',
                       borderRadius: '6px',
-                      background: 'rgba(15, 23, 42, 0.85)',
+                      background: 'rgba(8, 17, 12, 0.88)',
                       backdropFilter: 'blur(4px)',
-                      color: '#f8fafc',
+                      color: '#F9F2DA',
                       fontSize: '0.72rem',
                       fontWeight: 700,
                       textTransform: 'uppercase',
@@ -577,7 +577,7 @@ export default function MediaLibrary({
                       gap: '4px',
                     }}
                   >
-                    {item.type === 'video' ? <Film style={{ width: '12px', height: '12px', color: '#818cf8' }} /> : <ImageIcon style={{ width: '12px', height: '12px', color: '#818cf8' }} />}
+                    {item.type === 'video' ? <Film style={{ width: '12px', height: '12px', color: '#A5D86A' }} /> : <ImageIcon style={{ width: '12px', height: '12px', color: '#A5D86A' }} />}
                     {item.format || item.type}
                   </span>
 
@@ -610,12 +610,13 @@ export default function MediaLibrary({
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',
-                        background: isSelected ? '#6366f1' : 'rgba(0,0,0,0.6)',
+                        background: isSelected ? '#A5D86A' : 'rgba(0,0,0,0.6)',
                         border: '2px solid #fff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#fff',
+                        color: '#10210d',
+                        boxShadow: '0 0 0 2px rgba(165, 216, 106, 0.2)',
                       }}
                     >
                       {isSelected && <Check style={{ width: '14px', height: '14px' }} />}
@@ -626,17 +627,17 @@ export default function MediaLibrary({
                 {/* Info Bar */}
                 <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontWeight: 600 }}>
+                    <span style={{ color: '#C9C19A', fontSize: '0.78rem', fontWeight: 600 }}>
                       {formatBytes(item.fileSize)}
                     </span>
                     {item.width && item.height && (
-                      <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                      <span style={{ color: '#8AAE6E', fontSize: '0.75rem' }}>
                         {item.width}x{item.height}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ color: '#e2e8f0', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ color: '#F9F2DA', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     By {getUploaderName(item.uploadedBy)}
                   </div>
 
@@ -648,7 +649,7 @@ export default function MediaLibrary({
                       justifyContent: 'space-between',
                       marginTop: '8px',
                       paddingTop: '8px',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderTop: '1px solid rgba(185, 231, 105, 0.14)',
                     }}
                   >
                     <button
@@ -660,7 +661,7 @@ export default function MediaLibrary({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#818cf8',
+                        color: '#A5D86A',
                         cursor: 'pointer',
                         padding: '4px',
                         display: 'flex',
@@ -683,7 +684,7 @@ export default function MediaLibrary({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: copiedId === item.id ? '#4ade80' : '#94a3b8',
+                        color: copiedId === item.id ? '#8BD48A' : '#C9C19A',
                         cursor: 'pointer',
                         padding: '4px',
                       }}
@@ -724,7 +725,7 @@ export default function MediaLibrary({
             position: 'fixed',
             inset: 0,
             zIndex: 999,
-            background: 'rgba(0, 0, 0, 0.85)',
+            background: 'rgba(0, 0, 0, 0.7)',
             backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
@@ -740,8 +741,6 @@ export default function MediaLibrary({
               width: '100%',
               borderRadius: '20px',
               padding: '24px',
-              background: '#0f172a',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
               display: 'flex',
               flexDirection: 'column',
               gap: '20px',
@@ -857,8 +856,8 @@ export default function MediaLibrary({
             position: 'fixed',
             inset: 0,
             zIndex: 999,
-            background: 'rgba(0, 0, 0, 0.8)',
-            backdropFilter: 'blur(6px)',
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -873,8 +872,6 @@ export default function MediaLibrary({
               width: '100%',
               borderRadius: '16px',
               padding: '24px',
-              background: '#0f172a',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',

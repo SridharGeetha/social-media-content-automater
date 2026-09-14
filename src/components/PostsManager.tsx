@@ -23,6 +23,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import MediaLibrary, { MediaItem } from '@/components/MediaLibrary';
+import { CollectionSkeleton } from '@/components/LoadingSkeleton';
 
 export type PostStatus = 'DRAFT' | 'SCHEDULED' | 'QUEUED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 
@@ -286,22 +287,22 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
       {/* Top Action & Summary Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <FileText style={{ color: '#818cf8', width: '26px', height: '26px' }} />
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#FBF5DD', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <FileText style={{ color: '#B9E769', width: '26px', height: '26px' }} />
             Posts Management
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginTop: '4px' }}>
+          <p style={{ color: '#C9C19A', fontSize: '0.88rem', marginTop: '4px' }}>
             Create, view, schedule, and attach media to social posts for your workspace.
-            {userRole === 'CREATOR' && <span style={{ color: '#34d399', marginLeft: '6px', fontWeight: 600 }}>(Viewing & managing your posts)</span>}
+            {userRole === 'CREATOR' && <span style={{ color: '#8BD48A', marginLeft: '6px', fontWeight: 600 }}>(Viewing & managing your posts)</span>}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => openCreateModal('DRAFT')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={() => openCreateModal('DRAFT')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1' }}>
             <Save style={{ width: '16px', height: '16px' }} /> Save Draft
           </button>
 
-          <button onClick={() => openCreateModal('SCHEDULED')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={() => openCreateModal('SCHEDULED')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
             <Plus style={{ width: '18px', height: '18px' }} /> Create Post
           </button>
         </div>
@@ -321,8 +322,8 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
       )}
 
       {/* Status Filter Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginRight: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(185, 231, 105, 0.14)' }}>
+        <span style={{ color: '#B9E769', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', marginRight: '6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           <Filter style={{ width: '14px', height: '14px' }} /> Filter:
         </span>
         {STATUS_TABS.map((tab) => {
@@ -335,12 +336,12 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: isActive ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%)' : 'rgba(15, 23, 42, 0.4)',
+                background: isActive ? 'linear-gradient(135deg, rgba(48, 109, 41, 0.95) 0%, rgba(13, 83, 14, 0.95) 100%)' : 'rgba(15, 23, 42, 0.38)',
                 borderWidth: '1px',
                 borderStyle: 'solid',
-                borderColor: isActive ? '#6366f1' : 'rgba(255, 255, 255, 0.05)',
-                color: isActive ? '#f8fafc' : '#94a3b8',
-                fontWeight: isActive ? 700 : 500,
+                borderColor: isActive ? 'rgba(185, 231, 105, 0.4)' : 'rgba(185, 231, 105, 0.12)',
+                color: isActive ? '#FBF5DD' : '#C9C19A',
+                fontWeight: isActive ? 700 : 600,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
@@ -355,15 +356,12 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
       {/* Posts Table View */}
       {loading ? (
-        <div className="glass-panel" style={{ padding: '60px', textAlign: 'center' }}>
-          <Loader2 className="animate-spin" style={{ width: '32px', height: '32px', color: '#818cf8', margin: '0 auto 16px auto', animation: 'spin 1s linear infinite' }} />
-          <p style={{ color: '#94a3b8' }}>Loading workspace posts...</p>
-        </div>
+        <CollectionSkeleton rows={5} />
       ) : posts.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '60px', textAlign: 'center' }}>
-          <FileText style={{ width: '40px', height: '40px', color: '#64748b', margin: '0 auto 16px auto' }} />
-          <h3 style={{ fontSize: '1.2rem', color: '#f8fafc', marginBottom: '8px' }}>No Posts Found</h3>
-          <p style={{ color: '#94a3b8', fontSize: '0.88rem', maxWidth: '400px', margin: '0 auto 20px auto' }}>
+        <div className="glass-panel" style={{ padding: '60px', textAlign: 'center', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
+          <FileText style={{ width: '40px', height: '40px', color: '#B9E769', margin: '0 auto 16px auto' }} />
+          <h3 style={{ fontSize: '1.2rem', color: '#FBF5DD', marginBottom: '8px' }}>No Posts Found</h3>
+          <p style={{ color: '#C9C19A', fontSize: '0.88rem', maxWidth: '400px', margin: '0 auto 20px auto' }}>
             {activeTab === 'ALL'
               ? 'You have not created any social media posts yet. Click "+ Create Post" to start!'
               : `There are currently no posts with status "${activeTab}".`}
@@ -373,11 +371,11 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
           </button>
         </div>
       ) : (
-        <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+        <div className="glass-panel" style={{ padding: '0', overflow: 'hidden', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(15, 23, 42, 0.7)', color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <tr style={{ borderBottom: '1px solid rgba(185, 231, 105, 0.16)', backgroundColor: 'rgba(48, 109, 41, 0.12)', color: '#B9E769', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   <th style={{ padding: '16px 20px' }}>Post Content & Media</th>
                   <th style={{ padding: '16px 20px' }}>Status</th>
                   <th style={{ padding: '16px 20px' }}>Author</th>
@@ -465,7 +463,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                             onClick={() => setViewingPost(post)}
                             title="View Details"
                             className="btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
                           >
                             <Eye style={{ width: '14px', height: '14px' }} />
                           </button>
@@ -478,7 +476,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                                   disabled={publishingPostId === post.id}
                                   title="Publish to LinkedIn"
                                   className="btn-primary"
-                                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                  style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}
                                 >
                                   {publishingPostId === post.id ? <Loader2 className="animate-spin" style={{ width: '14px', height: '14px' }} /> : <Send style={{ width: '14px', height: '14px' }} />}
                                   Publish to LinkedIn
@@ -488,7 +486,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                                 onClick={() => openEditModal(post)}
                                 title="Edit Post"
                                 className="btn-secondary"
-                                style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
                               >
                                 <Edit3 style={{ width: '14px', height: '14px' }} />
                               </button>
@@ -497,7 +495,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                                 onClick={() => setDeletingPostId(post.id)}
                                 title="Delete Post"
                                 className="btn-secondary"
-                                style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#f87171' }}
+                                style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#fca5a5', background: 'rgba(127, 29, 29, 0.18)', borderColor: 'rgba(248, 113, 113, 0.3)' }}
                               >
                                 <Trash2 style={{ width: '14px', height: '14px' }} />
                               </button>
@@ -516,20 +514,27 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
       {/* CREATE / EDIT POST MODAL */}
       {(showCreateModal || editingPost) && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div className="glass-panel animate-fade-in" style={{ maxWidth: '680px', width: '100%', padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '1.3rem', color: '#f8fafc', fontWeight: 800 }}>
-                {editingPost ? 'Edit Post' : 'Create New Post'}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FileText style={{ color: '#B9E769', width: '22px', height: '22px' }} />
+                <h3 style={{ fontSize: '1.3rem', color: '#B9E769', fontWeight: 800, margin: 0 }}>
+                  {editingPost ? 'Edit Post' : 'Create New Post'}
+                </h3>
+              </div>
               <button onClick={() => { setShowCreateModal(false); setEditingPost(null); setAttachedMedia([]); }} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X style={{ width: '20px', height: '20px' }} />
               </button>
             </div>
 
+            <p style={{ fontSize: '0.88rem', color: '#C9C19A', marginBottom: '20px' }}>
+              Draft a post, attach media, set its status, and schedule it for the right publishing moment.
+            </p>
+
             <form onSubmit={(e) => handleSubmitPost(e)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <label className="input-label">Post Copy / Content</label>
+                <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Post Copy / Content</label>
                 <textarea
                   rows={4}
                   required
@@ -537,19 +542,18 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   placeholder="Write your social post content..."
                   className="input-field"
-                  style={{ resize: 'vertical' }}
+                  style={{ resize: 'vertical', background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
                 />
               </div>
 
-              {/* ATTACH MEDIA SECTION */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label className="input-label" style={{ marginBottom: 0 }}>Attached Media ({attachedMedia.length})</label>
+                  <label className="input-label" style={{ marginBottom: 0, color: '#B9E769', fontWeight: 700 }}>Attached Media ({attachedMedia.length})</label>
                   <button
                     type="button"
                     onClick={() => setShowMediaSelectorModal(true)}
                     className="btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#818cf8', borderColor: 'rgba(99, 102, 241, 0.4)' }}
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)' }}
                   >
                     <Paperclip style={{ width: '14px', height: '14px' }} /> Select or Upload Media
                   </button>
@@ -559,14 +563,14 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                   <div
                     onClick={() => setShowMediaSelectorModal(true)}
                     style={{
-                      border: '1px dashed rgba(255,255,255,0.15)',
+                      border: '1px dashed rgba(185, 231, 105, 0.28)',
                       borderRadius: '10px',
                       padding: '16px',
                       textAlign: 'center',
-                      color: '#64748b',
+                      color: '#C9C19A',
                       fontSize: '0.85rem',
                       cursor: 'pointer',
-                      background: 'rgba(15, 23, 42, 0.4)',
+                      background: 'rgba(48, 109, 41, 0.08)',
                     }}
                   >
                     No media attached yet. Click to attach images or videos from Cloudinary.
@@ -574,11 +578,11 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '8px' }}>
                     {attachedMedia.map((media) => (
-                      <div key={media.id} style={{ position: 'relative', width: '100%', height: '80px', borderRadius: '8px', overflow: 'hidden', background: '#020617', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div key={media.id} style={{ position: 'relative', width: '100%', height: '80px', borderRadius: '8px', overflow: 'hidden', background: '#020617', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
                         {media.type === 'image' ? (
                           <img src={media.secureUrl || media.cloudinaryUrl} alt="media preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8' }}>
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(48, 109, 41, 0.18)', color: '#B9E769' }}>
                             <Film style={{ width: '24px', height: '24px' }} />
                           </div>
                         )}
@@ -589,9 +593,9 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                             position: 'absolute',
                             top: '4px',
                             right: '4px',
-                            background: 'rgba(0,0,0,0.7)',
+                            background: 'rgba(0,0,0,0.75)',
                             border: 'none',
-                            color: '#f87171',
+                            color: '#fca5a5',
                             borderRadius: '50%',
                             width: '20px',
                             height: '20px',
@@ -611,12 +615,12 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
-                  <label className="input-label">Post Status</label>
+                  <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Post Status</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as PostStatus })}
-                    className="input-field"
-                    style={{ backgroundColor: '#0f172a' }}
+                    className="input-field invite-role-select"
+                    style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
                   >
                     <option value="DRAFT">DRAFT</option>
                     <option value="SCHEDULED">SCHEDULED</option>
@@ -628,13 +632,13 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                 </div>
 
                 <div>
-                  <label className="input-label">Scheduled Date & Time (Optional)</label>
+                  <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Scheduled Date & Time (Optional)</label>
                   <input
                     type="datetime-local"
                     value={formData.scheduledAt}
                     onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
                     className="input-field"
-                    style={{ backgroundColor: '#0f172a', colorScheme: 'dark' }}
+                    style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD', colorScheme: 'dark' }}
                   />
                 </div>
               </div>
@@ -644,6 +648,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                   type="button"
                   onClick={() => { setShowCreateModal(false); setEditingPost(null); setAttachedMedia([]); }}
                   className="btn-secondary"
+                  style={{ background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
                 >
                   Cancel
                 </button>
@@ -653,7 +658,7 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                   onClick={(e) => handleSubmitPost(e, 'DRAFT')}
                   disabled={submitting}
                   className="btn-secondary"
-                  style={{ borderColor: 'rgba(99, 102, 241, 0.4)', color: '#818cf8' }}
+                  style={{ borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)' }}
                 >
                   <Save style={{ width: '16px', height: '16px' }} /> Save as Draft
                 </button>
@@ -692,8 +697,8 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
       {/* MEDIA SELECTOR MODAL */}
       {showMediaSelectorModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div className="glass-panel animate-fade-in" style={{ maxWidth: '900px', width: '100%', padding: '28px', maxHeight: '90vh', overflowY: 'auto', background: '#0b1329', borderRadius: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div className="glass-panel animate-fade-in" style={{ maxWidth: '900px', width: '100%', padding: '28px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '1.25rem', color: '#f8fafc', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Paperclip style={{ color: '#818cf8', width: '22px', height: '22px' }} />
@@ -727,14 +732,14 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
       {/* VIEW POST DETAILS MODAL */}
       {viewingPost && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div className="glass-panel animate-fade-in" style={{ maxWidth: '640px', width: '100%', padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Eye style={{ color: '#818cf8', width: '22px', height: '22px' }} />
-                <h3 style={{ fontSize: '1.3rem', color: '#f8fafc' }}>Post Details</h3>
+                <Eye style={{ color: '#B9E769', width: '22px', height: '22px' }} />
+                <h3 style={{ fontSize: '1.3rem', color: '#F9F2DA' }}>Post Details</h3>
               </div>
-              <button onClick={() => setViewingPost(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setViewingPost(null)} style={{ background: 'none', border: 'none', color: '#C9C19A', cursor: 'pointer' }}>
                 <X style={{ width: '20px', height: '20px' }} />
               </button>
             </div>
@@ -742,18 +747,18 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 {renderStatusBadge(viewingPost.status)}
-                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  ID: <code style={{ color: '#818cf8' }}>{viewingPost.id}</code>
+                <span style={{ fontSize: '0.78rem', color: '#8C8A78' }}>
+                  ID: <code style={{ color: '#B9E769' }}>{viewingPost.id}</code>
                 </span>
               </div>
 
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)', color: '#f8fafc', fontSize: '1rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              <div style={{ background: 'rgba(11, 28, 16, 0.72)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(185, 231, 105, 0.14)', color: '#F9F2DA', fontSize: '1rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                 {viewingPost.content}
               </div>
 
               {viewingPost.media && viewingPost.media.length > 0 && (
                 <div>
-                  <h4 style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '10px' }}>Attached Media Assets ({viewingPost.media.length})</h4>
+                  <h4 style={{ fontSize: '0.85rem', color: '#C9C19A', marginBottom: '10px' }}>Attached Media Assets ({viewingPost.media.length})</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
                     {viewingPost.media.map((mItem, idx) => (
                       <a
@@ -761,12 +766,12 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                         href={mItem.secureUrl || mItem.cloudinaryUrl}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ display: 'block', borderRadius: '8px', overflow: 'hidden', background: '#020617', border: '1px solid rgba(255,255,255,0.1)', height: '90px', position: 'relative' }}
+                        style={{ display: 'block', borderRadius: '8px', overflow: 'hidden', background: '#020A04', border: '1px solid rgba(185, 231, 105, 0.18)', height: '90px', position: 'relative' }}
                       >
                         {mItem.type === 'image' ? (
                           <img src={mItem.secureUrl || mItem.cloudinaryUrl} alt="attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8' }}>
+                          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(48, 109, 41, 0.2)', color: '#B9E769' }}>
                             <Film style={{ width: '28px', height: '28px' }} />
                             <span style={{ fontSize: '0.7rem', marginTop: '4px', fontWeight: 600 }}>VIDEO</span>
                           </div>
@@ -777,35 +782,39 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: 'rgba(15, 23, 42, 0.4)', padding: '16px', borderRadius: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: 'rgba(11, 28, 16, 0.58)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(185, 231, 105, 0.1)' }}>
                 <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>AUTHOR</span>
-                  <span style={{ color: '#f8fafc', fontSize: '0.88rem', fontWeight: 600 }}>{viewingPost.author?.name || 'Unknown'}</span>
-                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>{viewingPost.author?.email}</span>
+                  <span style={{ color: '#8C8A78', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>AUTHOR</span>
+                  <span style={{ color: '#F9F2DA', fontSize: '0.88rem', fontWeight: 600 }}>{viewingPost.author?.name || 'Unknown'}</span>
+                  <span style={{ color: '#C9C19A', fontSize: '0.78rem', display: 'block' }}>{viewingPost.author?.email}</span>
                 </div>
 
                 <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>CREATED AT</span>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>{new Date(viewingPost.createdAt).toLocaleString()}</span>
+                  <span style={{ color: '#8C8A78', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>CREATED AT</span>
+                  <span style={{ color: '#E7E1B1', fontSize: '0.85rem' }}>{new Date(viewingPost.createdAt).toLocaleString()}</span>
                 </div>
 
                 {viewingPost.scheduledAt && (
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>SCHEDULED FOR</span>
-                    <span style={{ color: '#60a5fa', fontSize: '0.85rem' }}>{new Date(viewingPost.scheduledAt).toLocaleString()}</span>
+                    <span style={{ color: '#8C8A78', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>SCHEDULED FOR</span>
+                    <span style={{ color: '#B9E769', fontSize: '0.85rem' }}>{new Date(viewingPost.scheduledAt).toLocaleString()}</span>
                   </div>
                 )}
 
                 {viewingPost.publishedAt && (
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>PUBLISHED AT</span>
-                    <span style={{ color: '#34d399', fontSize: '0.85rem' }}>{new Date(viewingPost.publishedAt).toLocaleString()}</span>
+                    <span style={{ color: '#8C8A78', fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>PUBLISHED AT</span>
+                    <span style={{ color: '#8BD48A', fontSize: '0.85rem' }}>{new Date(viewingPost.publishedAt).toLocaleString()}</span>
                   </div>
                 )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button onClick={() => setViewingPost(null)} className="btn-secondary">
+                <button
+                  onClick={() => setViewingPost(null)}
+                  className="btn-secondary"
+                  style={{ background: 'rgba(48, 109, 41, 0.16)', borderColor: 'rgba(185, 231, 105, 0.32)', color: '#E7E1B1' }}
+                >
                   Close
                 </button>
               </div>
@@ -816,17 +825,21 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
       {/* DELETE CONFIRMATION MODAL */}
       {deletingPostId && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div className="glass-panel animate-fade-in" style={{ maxWidth: '440px', width: '100%', padding: '28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: '#f87171' }}>
               <AlertCircle style={{ width: '24px', height: '24px' }} />
-              <h3 style={{ fontSize: '1.2rem', color: '#f8fafc' }}>Confirm Post Deletion</h3>
+              <h3 style={{ fontSize: '1.2rem', color: '#f87171' }}>Confirm Post Deletion</h3>
             </div>
             <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '24px' }}>
               Are you sure you want to delete this post? This action cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setDeletingPostId(null)} className="btn-secondary">
+              <button
+                onClick={() => setDeletingPostId(null)}
+                className="btn-secondary"
+                style={{ background: 'rgba(48, 109, 41, 0.16)', borderColor: 'rgba(185, 231, 105, 0.32)', color: '#E7E1B1' }}
+              >
                 Cancel
               </button>
               <button
