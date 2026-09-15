@@ -16,7 +16,7 @@ import {
   UserCircle
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
-import MediaLibrary from '@/components/MediaLibrary';
+import MediaLibrary, { MediaItem } from '@/components/MediaLibrary';
 
 export default function CreatorDashboard() {
   const { data: session } = useSession();
@@ -43,28 +43,43 @@ export default function CreatorDashboard() {
   const [newTitle, setNewTitle] = useState('');
   const [newPlatform, setNewPlatform] = useState('Instagram Post');
   const [newBody, setNewBody] = useState('');
+  const [newScheduledAt, setNewScheduledAt] = useState('');
   const [submittedMessage, setSubmittedMessage] = useState(false);
+  const [savingPost, setSavingPost] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
 
-  const handleCreateDraft = (e: React.FormEvent) => {
+  const handleCreateDraft = async (e: React.FormEvent, status: 'DRAFT' | 'PENDING_REVIEW' = 'PENDING_REVIEW') => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newBody.trim() && !newTitle.trim()) return;
 
-    const newDraft = {
-      id: Date.now().toString(),
-      title: newTitle.trim(),
-      platform: newPlatform,
-      status: 'UNDER_REVIEW',
-      updatedAt: 'Just now',
-    };
-
-    setDrafts([newDraft, ...drafts]);
-    setNewTitle('');
-    setNewBody('');
-    setSubmittedMessage(true);
-    setTimeout(() => {
-      setSubmittedMessage(false);
-      setActiveTab('drafts');
-    }, 1500);
+    setSavingPost(true);
+    try {
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `${newTitle.trim()}\n\n${newBody.trim()}`.trim(),
+          mediaIds: selectedMedia.map((media) => media.id),
+          platform: newPlatform,
+          scheduledAt: newScheduledAt ? new Date(newScheduledAt).toISOString() : null,
+          status,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save post.');
+      setNewTitle('');
+      setNewBody('');
+      setNewScheduledAt('');
+      setSelectedMedia([]);
+      setSubmittedMessage(true);
+      setTimeout(() => {
+        setSubmittedMessage(false);
+        setActiveTab('drafts');
+      }, 1500);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingPost(false);
+    }
   };
 
   return (
@@ -227,7 +242,7 @@ export default function CreatorDashboard() {
               </div>
             )}
 
-            <form onSubmit={handleCreateDraft} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <form onSubmit={(event) => handleCreateDraft(event)} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
                 <label className="input-label">Content Title / Topic</label>
                 <input
@@ -267,11 +282,39 @@ export default function CreatorDashboard() {
                 />
               </div>
 
+              <div>
+                <label className="input-label">Image or Video</label>
+                <MediaLibrary
+                  selectable
+                  selectedMediaIds={selectedMedia.map((media) => media.id)}
+                  onSelectMedia={setSelectedMedia}
+                  userRole="CREATOR"
+                  currentUserId={session?.user?.id}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">Preferred Schedule (Optional)</label>
+                <input
+                  type="datetime-local"
+                  value={newScheduledAt}
+                  onChange={(e) => setNewScheduledAt(e.target.value)}
+                  min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                  className="input-field"
+                />
+                <p style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '6px' }}>
+                  The manager can change this time during approval.
+                </p>
+              </div>
+
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" onClick={() => setActiveTab('drafts')} className="btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+                <button type="button" onClick={(event) => handleCreateDraft(event, 'DRAFT')} disabled={savingPost} className="btn-secondary">
+                  Save Draft
+                </button>
+                <button type="submit" disabled={savingPost} className="btn-primary" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
                   <Send style={{ width: '16px', height: '16px' }} />
                   Submit for Manager Approval
                 </button>

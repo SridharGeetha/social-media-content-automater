@@ -1,71 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
-import { 
-  Users, 
-  CheckCircle2, 
-  Calendar, 
-  TrendingUp, 
-  LogOut, 
-  FileText, 
-  Clock, 
-  ThumbsUp, 
-  ThumbsDown,
+import {
+  CheckCircle2,
+  Calendar,
+  TrendingUp,
+  LogOut,
+  FileText,
+  Clock,
   Layers,
   Film,
-  UserCircle
+  UserCircle,
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
 
 export default function ManagerDashboard() {
   const { data: session } = useSession();
+  const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'queue' | 'calendar' | 'activity'>('posts');
 
-  // Simulated content review items for Manager Phase 1 UI
-  const [reviewItems, setReviewItems] = useState([
-    {
-      id: '1',
-      title: 'Q3 Product Announcement Reel & Infographic',
-      creator: 'Sarah Jenkins (Creator)',
-      platform: 'Instagram / LinkedIn',
-      status: 'Awaiting Approval',
-      submittedAt: '2 hours ago',
-    },
-    {
-      id: '2',
-      title: 'Weekly AI Innovations Thread & Carousel',
-      creator: 'David Miller (Creator)',
-      platform: 'Twitter / X',
-      status: 'Awaiting Approval',
-      submittedAt: '5 hours ago',
-    },
-  ]);
-
-  const handleApprove = (id: string) => {
-    setReviewItems((prev) => prev.filter((item) => item.id !== id));
-  };
+  useEffect(() => {
+    fetch('/api/members')
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.workspace?.name) setWorkspaceName(data.workspace.name);
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#090d16' }}>
-      {/* Manager Sidebar Navigation */}
-      <aside className="dashboard-sidebar"
-        style={{
-          width: '260px',
-          borderRight: '1px solid rgba(231, 225, 177, 0.42)',
-          background: 'linear-gradient(180deg, #041A05 0%, #08310C 25%, #0B3D12 100%)',
-          backdropFilter: 'blur(16px)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '24px 16px',
-        }}
-      >
+      <aside className="dashboard-sidebar" style={{ width: '260px', borderRight: '1px solid rgba(231, 225, 177, 0.42)', background: 'linear-gradient(180deg, #041A05 0%, #08310C 25%, #0B3D12 100%)', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', padding: '24px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 8px 24px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', marginBottom: '24px' }}>
           <div>
-            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-              Manager Studio
-            </div>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#B9E769', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>{workspaceName}</div>
             <span className="role-badge role-manager" style={{ fontSize: '0.68rem', padding: '2px 8px', marginTop: '2px' }}>
               MANAGER DASHBOARD
             </span>
@@ -137,11 +107,6 @@ export default function ManagerDashboard() {
               <Layers style={{ width: '18px', height: '18px' }} />
               Content Review Queue
             </div>
-            {reviewItems.length > 0 && (
-              <span style={{ fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.25)', padding: '2px 8px', borderRadius: '9999px', color: '#ffffff', fontWeight: 700 }}>
-                {reviewItems.length}
-              </span>
-            )}
           </button>
 
           <button
@@ -232,78 +197,8 @@ export default function ManagerDashboard() {
 
         {/* Content Review Queue */}
         {activeTab === 'queue' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>SUBMISSIONS TO REVIEW</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#22d3ee', marginTop: '4px' }}>{reviewItems.length}</div>
-              </div>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>APPROVED THIS WEEK</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>14</div>
-              </div>
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>ACTIVE CREATORS</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>5</div>
-              </div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '1.2rem', color: '#f8fafc', marginBottom: '16px' }}>Approval Queue</h3>
-
-              {reviewItems.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
-                  <CheckCircle2 style={{ width: '36px', height: '36px', color: '#34d399', margin: '0 auto 12px auto' }} />
-                  <p style={{ fontWeight: 600, color: '#f8fafc' }}>All clear! No pending submissions.</p>
-                  <p style={{ fontSize: '0.88rem' }}>Creators will submit new draft posts here for your review.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {reviewItems.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: '20px',
-                        borderRadius: '12px',
-                        background: 'rgba(15, 23, 42, 0.6)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '16px',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc' }}>{item.title}</div>
-                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '4px', display: 'flex', gap: '16px' }}>
-                          <span>Submitted by: <strong style={{ color: '#cbd5e1' }}>{item.creator}</strong></span>
-                          <span>Platforms: <strong style={{ color: '#22d3ee' }}>{item.platform}</strong></span>
-                          <span>Submitted: {item.submittedAt}</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          onClick={() => handleApprove(item.id)}
-                          className="btn-secondary"
-                          style={{ padding: '8px 16px', fontSize: '0.85rem', color: '#f87171' }}
-                        >
-                          <ThumbsDown style={{ width: '16px', height: '16px' }} /> Reject
-                        </button>
-                        <button
-                          onClick={() => handleApprove(item.id)}
-                          className="btn-primary"
-                          style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' }}
-                        >
-                          <ThumbsUp style={{ width: '16px', height: '16px' }} /> Approve Draft
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="animate-fade-in">
+            <PostsManager userRole="MANAGER" initialStatus="PENDING_REVIEW" />
           </div>
         )}
 

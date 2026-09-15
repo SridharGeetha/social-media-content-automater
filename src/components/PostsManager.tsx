@@ -25,7 +25,7 @@ import {
 import MediaLibrary, { MediaItem } from '@/components/MediaLibrary';
 import { CollectionSkeleton } from '@/components/LoadingSkeleton';
 
-export type PostStatus = 'DRAFT' | 'SCHEDULED' | 'QUEUED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
+export type PostStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'SCHEDULED' | 'QUEUED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
 
 export interface PostItem {
   id: string;
@@ -38,6 +38,7 @@ export interface PostItem {
     image?: string;
   } | null;
   content: string;
+    platform?: string;
   mediaIds: string[];
   media?: MediaItem[];
   status: PostStatus;
@@ -45,16 +46,21 @@ export interface PostItem {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  rejectionFeedback?: string | null;
 }
 
 interface PostsManagerProps {
   userRole?: 'ADMIN' | 'MANAGER' | 'CREATOR';
   currentUserId?: string;
+  initialStatus?: string;
 }
 
 const STATUS_TABS: { label: string; value: string }[] = [
   { label: 'All', value: 'ALL' },
   { label: 'Drafts', value: 'DRAFT' },
+  { label: 'Pending Review', value: 'PENDING_REVIEW' },
+  { label: 'Approved', value: 'APPROVED' },
+  { label: 'Rejected', value: 'REJECTED' },
   { label: 'Scheduled', value: 'SCHEDULED' },
   { label: 'Queued', value: 'QUEUED' },
   { label: 'Processing', value: 'PROCESSING' },
@@ -62,9 +68,9 @@ const STATUS_TABS: { label: string; value: string }[] = [
   { label: 'Failed', value: 'FAILED' },
 ];
 
-export default function PostsManager({ userRole, currentUserId }: PostsManagerProps) {
+export default function PostsManager({ userRole, currentUserId, initialStatus = 'ALL' }: PostsManagerProps) {
   const [posts, setPosts] = useState<PostItem[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [activeTab, setActiveTab] = useState<string>(initialStatus);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -84,6 +90,9 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
   const [attachedMedia, setAttachedMedia] = useState<MediaItem[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [publishingPostId, setPublishingPostId] = useState<string | null>(null);
+  const [reviewingPost, setReviewingPost] = useState<PostItem | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewScheduledAt, setReviewScheduledAt] = useState('');
 
   // Fetch Posts
   const fetchPosts = useCallback(async () => {
@@ -238,6 +247,32 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
     }
   };
 
+  const handleReview = async (action: 'APPROVE' | 'REJECT') => {
+    if (!reviewingPost || (action === 'REJECT' && !reviewFeedback.trim())) return;
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/posts/${reviewingPost.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          feedback: reviewFeedback,
+          scheduledAt: action === 'APPROVE' && reviewScheduledAt ? new Date(reviewScheduledAt).toISOString() : undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to review post.');
+      setReviewingPost(null);
+      setReviewFeedback('');
+      setReviewScheduledAt('');
+      await fetchPosts();
+    } catch (reason: unknown) {
+      setErrorMsg(reason instanceof Error ? reason.message : 'Failed to review post.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Status Badge Renderer
   const renderStatusBadge = (status: PostStatus) => {
     switch (status) {
@@ -245,6 +280,24 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
             <FileText style={{ width: '12px', height: '12px' }} /> DRAFT
+          </span>
+        );
+      case 'PENDING_REVIEW':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+            <Clock style={{ width: '12px', height: '12px' }} /> PENDING REVIEW
+          </span>
+        );
+      case 'APPROVED':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+            <CheckCircle2 style={{ width: '12px', height: '12px' }} /> APPROVED
+          </span>
+        );
+      case 'REJECTED':
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <AlertCircle style={{ width: '12px', height: '12px' }} /> REJECTED
           </span>
         );
       case 'SCHEDULED':
@@ -470,6 +523,20 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
 
                           {isOwnerOrManage && (
                             <>
+                              {post.status === 'PENDING_REVIEW' && (userRole === 'MANAGER' || userRole === 'ADMIN') && (
+                                <button
+                                  onClick={() => {
+                                    setReviewingPost(post);
+                                    setReviewFeedback('');
+                                    setReviewScheduledAt(post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : '');
+                                  }}
+                                  title="Review Post"
+                                  className="btn-primary"
+                                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                >
+                                  Review
+                                </button>
+                              )}
                               {post.status !== 'PUBLISHED' && (userRole === 'ADMIN' || userRole === 'CREATOR') && (
                                 <button
                                   onClick={() => handlePublishToLinkedIn(post)}
@@ -623,11 +690,12 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                     style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
                   >
                     <option value="DRAFT">DRAFT</option>
-                    <option value="SCHEDULED">SCHEDULED</option>
-                    <option value="QUEUED">QUEUED</option>
-                    <option value="PROCESSING">PROCESSING</option>
-                    <option value="PUBLISHED">PUBLISHED</option>
-                    <option value="FAILED">FAILED</option>
+                    {userRole !== 'CREATOR' && <option value="APPROVED">APPROVED</option>}
+                    {userRole !== 'CREATOR' && <option value="SCHEDULED">SCHEDULED</option>}
+                    {userRole !== 'CREATOR' && <option value="QUEUED">QUEUED</option>}
+                    {userRole !== 'CREATOR' && <option value="PROCESSING">PROCESSING</option>}
+                    {userRole !== 'CREATOR' && <option value="PUBLISHED">PUBLISHED</option>}
+                    {userRole !== 'CREATOR' && <option value="FAILED">FAILED</option>}
                   </select>
                 </div>
 
@@ -664,6 +732,16 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                 </button>
 
                 <button
+                  type="button"
+                  onClick={(e) => handleSubmitPost(e, 'PENDING_REVIEW')}
+                  disabled={submitting || userRole !== 'CREATOR'}
+                  className="btn-primary"
+                  style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}
+                >
+                  <Send style={{ width: '16px', height: '16px' }} /> Submit for Review
+                </button>
+
+                <button
                   type="submit"
                   disabled={submitting}
                   className="btn-primary"
@@ -691,6 +769,24 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {reviewingPost && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div className="glass-panel" style={{ maxWidth: '520px', width: '100%', padding: '28px' }}>
+            <h3 style={{ color: '#B9E769', marginBottom: '12px' }}>Review Submission</h3>
+            <p style={{ color: '#C9C19A', whiteSpace: 'pre-wrap', marginBottom: '18px' }}>{reviewingPost.content}</p>
+            <label className="input-label" style={{ color: '#B9E769' }}>Feedback (required when rejecting)</label>
+            <textarea className="input-field" rows={4} value={reviewFeedback} onChange={(e) => setReviewFeedback(e.target.value)} placeholder="Tell the creator what to change..." />
+            <label className="input-label" style={{ color: '#B9E769', marginTop: '14px' }}>Schedule after approval (optional)</label>
+            <input className="input-field" type="datetime-local" value={reviewScheduledAt} onChange={(e) => setReviewScheduledAt(e.target.value)} min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
+              <button className="btn-secondary" onClick={() => setReviewingPost(null)}>Cancel</button>
+              <button className="btn-secondary" onClick={() => handleReview('REJECT')} disabled={submitting || !reviewFeedback.trim()} style={{ color: '#fca5a5' }}>Reject</button>
+              <button className="btn-primary" onClick={() => handleReview('APPROVE')} disabled={submitting}>Approve</button>
+            </div>
           </div>
         </div>
       )}
@@ -755,6 +851,13 @@ export default function PostsManager({ userRole, currentUserId }: PostsManagerPr
               <div style={{ background: 'rgba(11, 28, 16, 0.72)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(185, 231, 105, 0.14)', color: '#F9F2DA', fontSize: '1rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                 {viewingPost.content}
               </div>
+
+              {viewingPost.status === 'REJECTED' && viewingPost.rejectionFeedback && (
+                <div style={{ background: 'rgba(127, 29, 29, 0.18)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(248, 113, 113, 0.3)', color: '#fecaca' }}>
+                  <strong>Manager feedback</strong>
+                  <div style={{ marginTop: '6px', whiteSpace: 'pre-wrap' }}>{viewingPost.rejectionFeedback}</div>
+                </div>
+              )}
 
               {viewingPost.media && viewingPost.media.length > 0 && (
                 <div>

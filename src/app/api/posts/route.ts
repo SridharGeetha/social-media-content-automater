@@ -7,7 +7,7 @@ import User from '@/models/User';
 import Media from '@/models/Media';
 import { scheduleLinkedInPost } from '@/lib/qstash';
 
-const VALID_STATUSES: PostStatus[] = ['DRAFT', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
+const VALID_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
 export async function GET(req: NextRequest) {
   try {
@@ -102,6 +102,7 @@ export async function GET(req: NextRequest) {
         publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
+        rejectionFeedback: post.rejectionFeedback || null,
       };
     });
 
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { content, mediaIds, status, scheduledAt } = body;
+  const { content, mediaIds, platform, status, scheduledAt } = body;
 
     if (!content || typeof content !== 'string' || !content.trim()) {
       return NextResponse.json({ error: 'Post content is required.' }, { status: 400 });
@@ -153,16 +154,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const postStatus: PostStatus = status && VALID_STATUSES.includes(status.toUpperCase() as PostStatus)
+    const requestedStatus = status?.toUpperCase() as PostStatus | undefined;
+    if (requestedStatus && !VALID_STATUSES.includes(requestedStatus)) {
+      return NextResponse.json({ error: 'Invalid post status.' }, { status: 400 });
+    }
+    if (currentMember.role === 'CREATOR' && requestedStatus && !['DRAFT', 'PENDING_REVIEW'].includes(requestedStatus)) {
+      return NextResponse.json({ error: 'Creators can only save drafts or submit posts for review.' }, { status: 403 });
+    }
+
+    const postStatus: PostStatus = requestedStatus
       ? (status.toUpperCase() as PostStatus)
       : 'DRAFT';
 
     let parsedScheduledAt: Date | null = null;
-    if (scheduledAt) {
+    if (scheduledAt !== undefined && scheduledAt !== null && scheduledAt !== '') {
       const d = new Date(scheduledAt);
-      if (!isNaN(d.getTime())) {
-        parsedScheduledAt = d;
+      if (isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+        return NextResponse.json({ error: 'The preferred schedule time must be a valid future date.' }, { status: 400 });
       }
+      parsedScheduledAt = d;
     }
 
     if (postStatus === 'SCHEDULED' && (!parsedScheduledAt || parsedScheduledAt.getTime() <= Date.now())) {
@@ -178,6 +188,7 @@ export async function POST(req: NextRequest) {
       workspaceId: currentMember.workspaceId,
       createdBy: userId,
       content: content.trim(),
+        platform: typeof platform === 'string' ? platform.trim() : 'LINKEDIN',
       mediaIds: cleanMediaIds,
       status: postStatus,
       scheduledAt: parsedScheduledAt,
@@ -246,6 +257,7 @@ export async function POST(req: NextRequest) {
               }
             : null,
           content: newPost.content,
+                    platform: newPost.platform,
           mediaIds: cleanMediaIds,
           media: mediaList,
           status: newPost.status,
@@ -253,6 +265,7 @@ export async function POST(req: NextRequest) {
           publishedAt: newPost.publishedAt ? newPost.publishedAt.toISOString() : null,
           createdAt: newPost.createdAt.toISOString(),
           updatedAt: newPost.updatedAt.toISOString(),
+          rejectionFeedback: newPost.rejectionFeedback || null,
         },
       },
       { status: 201 }

@@ -7,7 +7,7 @@ import User from '@/models/User';
 import Media from '@/models/Media';
 import { scheduleLinkedInPost } from '@/lib/qstash';
 
-const VALID_STATUSES: PostStatus[] = ['DRAFT', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
+const VALID_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
 export async function GET(
   req: NextRequest,
@@ -98,6 +98,7 @@ export async function GET(
         publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
+        rejectionFeedback: post.rejectionFeedback || null,
       },
     });
   } catch (error: unknown) {
@@ -139,7 +140,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { content, mediaIds, status, scheduledAt, publishedAt } = body;
+    const { content, mediaIds, platform, status, scheduledAt, publishedAt } = body;
     const shouldSchedule = status?.toUpperCase() === 'SCHEDULED' || scheduledAt !== undefined;
 
     if (content !== undefined) {
@@ -149,6 +150,9 @@ export async function PATCH(
       post.content = content.trim();
     }
 
+    if (platform !== undefined && typeof platform === 'string' && platform.trim()) {
+      post.platform = platform.trim();
+    }
     if (Array.isArray(mediaIds)) {
       const cleanMediaIds = mediaIds.filter((mId) => typeof mId === 'string' && mId.trim());
       if (cleanMediaIds.length > 0) {
@@ -171,6 +175,18 @@ export async function PATCH(
       const upperStatus = status.toUpperCase() as PostStatus;
       if (!VALID_STATUSES.includes(upperStatus)) {
         return NextResponse.json({ error: 'Invalid post status.' }, { status: 400 });
+      }
+      if (currentMember.role === 'CREATOR' && !['DRAFT', 'PENDING_REVIEW'].includes(upperStatus)) {
+        return NextResponse.json({ error: 'Creators can only save drafts or submit posts for review.' }, { status: 403 });
+      }
+      if (currentMember.role === 'CREATOR' && upperStatus === 'PENDING_REVIEW' && !['DRAFT', 'REJECTED'].includes(post.status)) {
+        return NextResponse.json({ error: 'Only drafts and rejected posts can be submitted for review.' }, { status: 409 });
+      }
+      if (currentMember.role === 'MANAGER' && ['PUBLISHED', 'PROCESSING', 'FAILED'].includes(upperStatus)) {
+        return NextResponse.json({ error: 'Managers cannot set publishing lifecycle states directly.' }, { status: 403 });
+      }
+      if ((currentMember.role === 'MANAGER' || currentMember.role === 'ADMIN') && upperStatus === 'SCHEDULED' && post.status !== 'APPROVED') {
+        return NextResponse.json({ error: 'Only approved posts can be scheduled.' }, { status: 409 });
       }
       post.status = upperStatus;
 
@@ -282,6 +298,7 @@ export async function PATCH(
         publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
+        rejectionFeedback: post.rejectionFeedback || null,
       },
     });
   } catch (error: unknown) {

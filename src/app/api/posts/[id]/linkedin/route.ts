@@ -20,14 +20,14 @@ export async function POST(
 
     const membership = await WorkspaceMember.findOne({ userId: session.user.id }).sort({ createdAt: -1 });
     if (!membership) return NextResponse.json({ error: 'Workspace membership not found.' }, { status: 404 });
-    if (membership.role !== 'ADMIN' && membership.role !== 'CREATOR') {
-      return NextResponse.json({ error: 'Forbidden. Only Admins and Creators can publish to LinkedIn.' }, { status: 403 });
+    if (membership.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden. Only admins can publish directly to LinkedIn.' }, { status: 403 });
     }
 
     const post = await Post.findOne({ _id: id, workspaceId: membership.workspaceId });
     if (!post) return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
-    if (membership.role === 'CREATOR' && post.createdBy.toString() !== session.user.id) {
-      return NextResponse.json({ error: 'Forbidden: Creators can only publish their own posts.' }, { status: 403 });
+    if (post.status !== 'APPROVED' && post.status !== 'SCHEDULED') {
+      return NextResponse.json({ error: 'Only approved or scheduled posts can be published.' }, { status: 409 });
     }
     if (post.status === 'PUBLISHED' && post.publishing?.externalPostId) {
       return NextResponse.json({ error: 'This post has already been published to LinkedIn.' }, { status: 409 });
