@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { auth } from '@/auth';
 import connectToDatabase from '@/lib/db';
 import Post from '@/models/Post';
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     post.status = action === 'APPROVE' ? (parsedScheduledAt ? 'SCHEDULED' : 'APPROVED') : 'REJECTED';
     post.scheduledAt = parsedScheduledAt;
     post.rejectionFeedback = action === 'REJECT' ? feedback.trim() : null;
-    post.reviewedBy = session.user.id;
+    post.reviewedBy = new mongoose.Types.ObjectId(session.user.id);
     post.reviewedAt = new Date();
     await post.save();
 
