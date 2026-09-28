@@ -27,6 +27,11 @@ export function getProductionPublishUrl(): string {
   return `${baseUrl.replace(/\/$/, '')}/api/publish`;
 }
 
+export function getProductionInstagramPublishUrl(): string {
+  const baseUrl = process.env.APP_URL || process.env.NEXTAUTH_URL || 'https://social-media-content-automater.vercel.app';
+  return `${baseUrl.replace(/\/$/, '')}/api/publish/instagram`;
+}
+
 export async function scheduleLinkedInPost(postId: string, scheduledAt: Date): Promise<string> {
   const scheduledUnixTime = scheduledAt.getTime();
   if (scheduledUnixTime <= Date.now()) {
@@ -49,4 +54,33 @@ export async function scheduleLinkedInPost(postId: string, scheduledAt: Date): P
   }
 
   return result.messageId;
+}
+
+export async function scheduleInstagramPost(postId: string, scheduledAt: Date): Promise<string> {
+  const scheduledUnixTime = scheduledAt.getTime();
+  if (scheduledUnixTime <= Date.now()) {
+    throw new Error('Scheduled time must be in the future.');
+  }
+
+  if (scheduledUnixTime - Date.now() > QSTASH_MAX_DELAY_MS) {
+    throw new Error('QStash supports scheduled posts only up to 7 days in advance.');
+  }
+
+  const result = await getQStashClient().publishJSON({
+    url: getProductionInstagramPublishUrl(),
+    body: { postId },
+    notBefore: Math.floor(scheduledUnixTime / 1000),
+    deduplicationId: `instagram-post-${postId}`,
+  });
+
+  if (!result.messageId) {
+    throw new Error('QStash did not return a message ID for the scheduled Instagram post.');
+  }
+
+  return result.messageId;
+}
+
+export async function schedulePost(postId: string, scheduledAt: Date, targetPlatform?: string): Promise<string> {
+  if (targetPlatform === 'INSTAGRAM') return scheduleInstagramPost(postId, scheduledAt);
+  return scheduleLinkedInPost(postId, scheduledAt);
 }

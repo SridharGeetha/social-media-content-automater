@@ -84,6 +84,11 @@ Create Post ──> Add Image / Video ──> Upload to Cloudinary ──> Cloud
     LINKEDIN_CLIENT_ID=your_linkedin_client_id
     LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
     LINKEDIN_REDIRECT_URI=http://localhost:3000/api/social/linkedin/callback
+    INSTAGRAM_CLIENT_ID=your_instagram_app_id
+    INSTAGRAM_CLIENT_SECRET=your_instagram_app_secret
+    INSTAGRAM_REDIRECT_URI=http://localhost:3000/api/social/instagram/callback
+    INSTAGRAM_SCOPE=instagram_business_basic,instagram_business_content_publish
+    INSTAGRAM_GRAPH_API_VERSION=v23.0
     SOCIAL_TOKEN_ENCRYPTION_KEY=base64_encoded_32_byte_key
    ```
 
@@ -98,7 +103,20 @@ Create Post ──> Add Image / Video ──> Upload to Cloudinary ──> Cloud
   - `GET /api/social/linkedin`: Admin-only connection status without token data.
   - `DELETE /api/social/linkedin`: Admin-only disconnect.
 
-  LinkedIn publishing and scheduling are intentionally outside this phase.
+  ## Instagram Business Login and Publishing
+
+  Workspace Admins can connect one Instagram Professional account through Meta Instagram Business Login. The OAuth flow requests `instagram_business_basic` and `instagram_business_content_publish`, validates a separate signed state cookie, and stores the long-lived access token encrypted against the active workspace. Immediate publishing currently supports one attached image from a public HTTPS media URL.
+
+  Available endpoints:
+
+  - `GET /api/social/instagram/connect`: Admin-only OAuth start.
+  - `GET /api/social/instagram/callback`: OAuth callback and workspace-scoped connection upsert.
+  - `GET /api/social/instagram`: Admin-only connection status without token data.
+  - `DELETE /api/social/instagram`: Admin-only disconnect.
+  - `POST /api/posts/:id/instagram`: Admin-only immediate publishing of an approved post.
+  - `POST /api/publish/instagram`: QStash-signed scheduled publishing endpoint.
+
+  Existing LinkedIn connection and publishing routes remain separate.
 
 ---
 

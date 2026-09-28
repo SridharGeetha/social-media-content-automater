@@ -1,11 +1,12 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export type PostStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'SCHEDULED' | 'QUEUED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED';
+export type PostTargetPlatform = 'LINKEDIN' | 'INSTAGRAM';
 
 const POST_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
 export interface IPostPublishing {
-  platform: 'LINKEDIN';
+  platform: PostTargetPlatform;
   externalPostId?: string;
   publishedAt?: Date;
   error?: string;
@@ -17,6 +18,7 @@ export interface IPost extends Document {
   createdBy: mongoose.Types.ObjectId;
   content: string;
   platform?: string;
+  targetPlatform: PostTargetPlatform;
   mediaIds: string[];
   status: PostStatus;
   scheduledAt?: Date | null;
@@ -35,6 +37,7 @@ const PostSchema: Schema<IPost> = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     content: { type: String, required: true, trim: true },
       platform: { type: String, default: 'LINKEDIN' },
+    targetPlatform: { type: String, enum: ['LINKEDIN', 'INSTAGRAM'], default: 'LINKEDIN', required: true },
     mediaIds: [{ type: Schema.Types.ObjectId, ref: 'Media' }],
     status: {
       type: String,
@@ -46,7 +49,7 @@ const PostSchema: Schema<IPost> = new Schema(
     scheduledAt: { type: Date, default: null },
     publishedAt: { type: Date, default: null },
     publishing: {
-      platform: { type: String, enum: ['LINKEDIN'] },
+      platform: { type: String, enum: ['LINKEDIN', 'INSTAGRAM'] },
       externalPostId: { type: String },
       publishedAt: { type: Date },
       error: { type: String },

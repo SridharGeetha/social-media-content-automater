@@ -8,6 +8,11 @@ interface LinkedInAccount {
   status: 'CONNECTED' | 'DISCONNECTED';
 }
 
+interface InstagramAccount {
+  accountName: string;
+  status: 'CONNECTED' | 'DISCONNECTED';
+}
+
 function LinkedInBrandMark({ size = 40 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="LinkedIn" style={{ display: 'block' }}><rect width="24" height="24" rx="5" fill="#0A66C2" /><path d="M6.94 8.5a1.56 1.56 0 1 1 0-3.12 1.56 1.56 0 0 1 0 3.12ZM5.5 9.75h2.88v7.75H5.5V9.75Zm4.68 0h2.77v1.06h.04c.39-.73 1.33-1.5 2.74-1.5 2.94 0 3.48 1.93 3.48 4.44v3.75h-2.88v-3.5c0-1.02-.02-2.34-1.42-2.34-1.43 0-1.65 1.11-1.65 2.26v3.58H10.18V9.75Z" fill="#fff" /></svg>;
 }
@@ -26,14 +31,19 @@ function AccountRow({ name, icon, connected, accountName, loading, connecting, d
 
 export default function SocialAccountsPanel() {
   const [account, setAccount] = useState<LinkedInAccount | null>(null);
+  const [instagramAccount, setInstagramAccount] = useState<InstagramAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [instagramLoading, setInstagramLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [instagramConnecting, setInstagramConnecting] = useState(false);
+  const [instagramDisconnecting, setInstagramDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     fetch('/api/social/linkedin').then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load social accounts.'); if (active) setAccount(data.account || null); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load social accounts.'); }).finally(() => { if (active) setLoading(false); });
+    fetch('/api/social/instagram').then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load social accounts.'); if (active) setInstagramAccount(data.account || null); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load social accounts.'); }).finally(() => { if (active) setInstagramLoading(false); });
     return () => { active = false; };
   }, []);
 
@@ -43,6 +53,13 @@ export default function SocialAccountsPanel() {
     try { const response = await fetch('/api/social/linkedin', { method: 'DELETE' }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to disconnect LinkedIn.'); setAccount(null); } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : 'Unable to disconnect LinkedIn.'); } finally { setDisconnecting(false); }
   };
 
+  const disconnectInstagram = async () => {
+    setInstagramDisconnecting(true);
+    setError(null);
+    try { const response = await fetch('/api/social/instagram', { method: 'DELETE' }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to disconnect Instagram.'); setInstagramAccount(null); } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : 'Unable to disconnect Instagram.'); } finally { setInstagramDisconnecting(false); }
+  };
+
   const connected = account?.status === 'CONNECTED';
-  return <div className="social-account-panel"><p style={{ color: '#C9C19A', margin: '0 0 24px', fontSize: '0.95rem' }}>Connect workspace publishing accounts securely. Tokens are encrypted and never shown here.</p>{error && <div className="social-account-error" role="alert"><AlertCircle style={{ width: '18px', height: '18px' }} />{error}</div>}<div className="social-account-list"><AccountRow name="LinkedIn" icon={<LinkedInBrandMark />} connected={connected} accountName={account?.accountName} loading={loading} connecting={connecting} disconnecting={disconnecting} available onConnect={() => { setConnecting(true); window.location.href = '/api/social/linkedin/connect'; }} onDisconnect={disconnect} /><AccountRow name="Instagram" icon={<InstagramBrandMark />} connected={false} available={false} /><AccountRow name="Facebook" icon={<FacebookBrandMark />} connected={false} available={false} /></div></div>;
+  const instagramConnected = instagramAccount?.status === 'CONNECTED';
+  return <div className="social-account-panel"><p style={{ color: '#C9C19A', margin: '0 0 24px', fontSize: '0.95rem' }}>Connect workspace publishing accounts securely. Tokens are encrypted and never shown here.</p>{error && <div className="social-account-error" role="alert"><AlertCircle style={{ width: '18px', height: '18px' }} />{error}</div>}<div className="social-account-list"><AccountRow name="LinkedIn" icon={<LinkedInBrandMark />} connected={connected} accountName={account?.accountName} loading={loading} connecting={connecting} disconnecting={disconnecting} available onConnect={() => { setConnecting(true); window.location.href = '/api/social/linkedin/connect'; }} onDisconnect={disconnect} /><AccountRow name="Instagram" icon={<InstagramBrandMark />} connected={instagramConnected} accountName={instagramAccount?.accountName} loading={instagramLoading} connecting={instagramConnecting} disconnecting={instagramDisconnecting} available onConnect={() => { setInstagramConnecting(true); window.location.href = '/api/social/instagram/connect'; }} onDisconnect={disconnectInstagram} /><AccountRow name="Facebook" icon={<FacebookBrandMark />} connected={false} available={false} /></div></div>;
 }

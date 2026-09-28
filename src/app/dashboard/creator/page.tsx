@@ -61,6 +61,7 @@ export default function CreatorDashboard() {
           content: `${newTitle.trim()}\n\n${newBody.trim()}`.trim(),
           mediaIds: selectedMedia.map((media) => media.id),
           platform: newPlatform,
+          targetPlatform: newPlatform.startsWith('Instagram') ? 'INSTAGRAM' : 'LINKEDIN',
           scheduledAt: newScheduledAt ? new Date(newScheduledAt).toISOString() : null,
           status,
         }),

@@ -38,7 +38,8 @@ export interface PostItem {
     image?: string;
   } | null;
   content: string;
-    platform?: string;
+  platform?: string;
+  targetPlatform?: 'LINKEDIN' | 'INSTAGRAM';
   mediaIds: string[];
   media?: MediaItem[];
   status: PostStatus;
@@ -86,6 +87,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     content: '',
     status: 'DRAFT' as PostStatus,
     scheduledAt: '',
+    targetPlatform: 'LINKEDIN' as 'LINKEDIN' | 'INSTAGRAM',
   });
   const [attachedMedia, setAttachedMedia] = useState<MediaItem[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -129,6 +131,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       content: '',
       status: defaultStatus,
       scheduledAt: '',
+      targetPlatform: 'LINKEDIN',
     });
     setAttachedMedia([]);
     setShowCreateModal(true);
@@ -150,25 +153,30 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       content: post.content,
       status: post.status,
       scheduledAt: schedDate,
+      targetPlatform: post.targetPlatform || 'LINKEDIN',
     });
     setAttachedMedia(post.media || []);
     setEditingPost(post);
   };
 
   // Handle Submit (Create / Edit)
-  const handleSubmitPost = async (e: React.FormEvent, forceStatus?: PostStatus, publishToLinkedIn = false) => {
+  const handleSubmitPost = async (e: React.FormEvent, forceStatus?: PostStatus, publishImmediately = false) => {
     e.preventDefault();
     if (!formData.content.trim()) return;
 
     setSubmitting(true);
     setErrorMsg(null);
 
-    const targetStatus = forceStatus || formData.status;
+    const requestedStatus = forceStatus || formData.status;
+    const targetStatus = publishImmediately && formData.targetPlatform === 'INSTAGRAM' && requestedStatus !== 'SCHEDULED'
+      ? 'APPROVED'
+      : requestedStatus;
     const mediaIdsArray = attachedMedia.map((m) => m.id);
 
     const payload = {
       content: formData.content.trim(),
       mediaIds: mediaIdsArray,
+      targetPlatform: formData.targetPlatform,
       status: targetStatus,
       scheduledAt: formData.scheduledAt ? new Date(formData.scheduledAt).toISOString() : null,
     };
@@ -192,10 +200,11 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       const data = await res.json();
 
       if (res.ok) {
-        if (publishToLinkedIn) {
-          const publishResponse = await fetch(`/api/posts/${data.post.id}/linkedin`, { method: 'POST' });
+        if (publishImmediately) {
+          const route = formData.targetPlatform === 'INSTAGRAM' ? 'instagram' : 'linkedin';
+          const publishResponse = await fetch(`/api/posts/${data.post.id}/${route}`, { method: 'POST' });
           const publishData = await publishResponse.json();
-          if (!publishResponse.ok) throw new Error(publishData.error || 'Failed to publish post to LinkedIn.');
+          if (!publishResponse.ok) throw new Error(publishData.error || `Failed to publish post to ${formData.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}.`);
         }
         setShowCreateModal(false);
         setEditingPost(null);
@@ -232,16 +241,17 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     }
   };
 
-  const handlePublishToLinkedIn = async (post: PostItem) => {
+  const handlePublishPost = async (post: PostItem) => {
     setPublishingPostId(post.id);
     setErrorMsg(null);
     try {
-      const response = await fetch(`/api/posts/${post.id}/linkedin`, { method: 'POST' });
+      const targetPlatform = post.targetPlatform || 'LINKEDIN';
+      const response = await fetch(`/api/posts/${post.id}/${targetPlatform === 'INSTAGRAM' ? 'instagram' : 'linkedin'}`, { method: 'POST' });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to publish post to LinkedIn.');
+      if (!response.ok) throw new Error(data.error || `Failed to publish post to ${targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}.`);
       await fetchPosts();
     } catch (reason: unknown) {
-      setErrorMsg(reason instanceof Error ? reason.message : 'Failed to publish post to LinkedIn.');
+      setErrorMsg(reason instanceof Error ? reason.message : 'Failed to publish post.');
     } finally {
       setPublishingPostId(null);
     }
@@ -537,16 +547,17 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                                   Review
                                 </button>
                               )}
-                              {post.status !== 'PUBLISHED' && (userRole === 'ADMIN' || userRole === 'CREATOR') && (
+                              {post.status !== 'PUBLISHED' && (userRole === 'ADMIN' || userRole === 'CREATOR') &&
+                                ((post.targetPlatform || 'LINKEDIN') !== 'INSTAGRAM' || (userRole === 'ADMIN' && post.status === 'APPROVED')) && (
                                 <button
-                                  onClick={() => handlePublishToLinkedIn(post)}
+                                  onClick={() => handlePublishPost(post)}
                                   disabled={publishingPostId === post.id}
-                                  title="Publish to LinkedIn"
+                                  title={`Publish to ${post.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}`}
                                   className="btn-primary"
                                   style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}
                                 >
                                   {publishingPostId === post.id ? <Loader2 className="animate-spin" style={{ width: '14px', height: '14px' }} /> : <Send style={{ width: '14px', height: '14px' }} />}
-                                  Publish to LinkedIn
+                                  Publish to {post.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}
                                 </button>
                               )}
                               <button
@@ -600,6 +611,19 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
             </p>
 
             <form onSubmit={(e) => handleSubmitPost(e)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Publishing Destination</label>
+                <select
+                  value={formData.targetPlatform}
+                  onChange={(e) => setFormData({ ...formData, targetPlatform: e.target.value as 'LINKEDIN' | 'INSTAGRAM' })}
+                  className="input-field invite-role-select"
+                  style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
+                >
+                  <option value="LINKEDIN">LinkedIn</option>
+                  <option value="INSTAGRAM">Instagram</option>
+                </select>
+              </div>
+
               <div>
                 <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Post Copy / Content</label>
                 <textarea
@@ -765,7 +789,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                   className="btn-primary"
                 >
                   {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
-                  Publish to LinkedIn
+                  Publish to {formData.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}
                 </button>
               </div>
             </form>

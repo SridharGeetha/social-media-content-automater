@@ -5,7 +5,7 @@ import Post, { PostStatus } from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
 import User from '@/models/User';
 import Media from '@/models/Media';
-import { scheduleLinkedInPost } from '@/lib/qstash';
+import { schedulePost } from '@/lib/qstash';
 
 const VALID_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
@@ -91,6 +91,7 @@ export async function GET(
             }
           : null,
         content: post.content,
+        targetPlatform: post.targetPlatform || 'LINKEDIN',
         mediaIds: rawMediaIds,
         media: mediaList,
         status: post.status,
@@ -140,7 +141,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { content, mediaIds, platform, status, scheduledAt, publishedAt } = body;
+    const { content, mediaIds, platform, targetPlatform, status, scheduledAt, publishedAt } = body;
     const shouldSchedule = status?.toUpperCase() === 'SCHEDULED' || scheduledAt !== undefined;
 
     if (content !== undefined) {
@@ -152,6 +153,12 @@ export async function PATCH(
 
     if (platform !== undefined && typeof platform === 'string' && platform.trim()) {
       post.platform = platform.trim();
+    }
+    if (targetPlatform !== undefined) {
+      if (targetPlatform !== 'LINKEDIN' && targetPlatform !== 'INSTAGRAM') {
+        return NextResponse.json({ error: 'Invalid target platform.' }, { status: 400 });
+      }
+      post.targetPlatform = targetPlatform;
     }
     if (Array.isArray(mediaIds)) {
       const cleanMediaIds = mediaIds.filter((mId) => typeof mId === 'string' && mId.trim());
@@ -225,11 +232,11 @@ export async function PATCH(
 
     if (shouldSchedule && post.status === 'SCHEDULED' && post.scheduledAt) {
       try {
-        await scheduleLinkedInPost(post._id.toString(), post.scheduledAt);
+        await schedulePost(post._id.toString(), post.scheduledAt, post.targetPlatform || 'LINKEDIN');
       } catch (error) {
         post.status = 'FAILED';
         post.publishing = {
-          platform: 'LINKEDIN',
+          platform: post.targetPlatform || 'LINKEDIN',
           error: error instanceof Error ? error.message : 'Failed to schedule post.',
         };
         await post.save();
@@ -291,6 +298,7 @@ export async function PATCH(
             }
           : null,
         content: post.content,
+        targetPlatform: post.targetPlatform || 'LINKEDIN',
         mediaIds: rawMediaIds,
         media: mediaList,
         status: post.status,

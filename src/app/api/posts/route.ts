@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectToDatabase from '@/lib/db';
-import Post, { PostStatus } from '@/models/Post';
+import Post, { PostStatus, PostTargetPlatform } from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
 import User from '@/models/User';
 import Media from '@/models/Media';
-import { scheduleLinkedInPost } from '@/lib/qstash';
+import { schedulePost } from '@/lib/qstash';
 
 const VALID_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
@@ -95,6 +95,7 @@ export async function GET(req: NextRequest) {
             }
           : null,
         content: post.content,
+        targetPlatform: post.targetPlatform || 'LINKEDIN',
         mediaIds: rawMediaIds,
         media: mediaList,
         status: post.status,
@@ -131,10 +132,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-  const { content, mediaIds, platform, status, scheduledAt } = body;
+  const { content, mediaIds, platform, targetPlatform, status, scheduledAt } = body;
 
     if (!content || typeof content !== 'string' || !content.trim()) {
       return NextResponse.json({ error: 'Post content is required.' }, { status: 400 });
+    }
+
+    const selectedTargetPlatform = targetPlatform === undefined ? 'LINKEDIN' : targetPlatform;
+    if (selectedTargetPlatform !== 'LINKEDIN' && selectedTargetPlatform !== 'INSTAGRAM') {
+      return NextResponse.json({ error: 'Invalid target platform.' }, { status: 400 });
     }
 
     // Workspace Isolation Check for Attached Media:
@@ -188,7 +194,8 @@ export async function POST(req: NextRequest) {
       workspaceId: currentMember.workspaceId,
       createdBy: userId,
       content: content.trim(),
-        platform: typeof platform === 'string' ? platform.trim() : 'LINKEDIN',
+      platform: typeof platform === 'string' ? platform.trim() : 'LINKEDIN',
+      targetPlatform: selectedTargetPlatform as PostTargetPlatform,
       mediaIds: cleanMediaIds,
       status: postStatus,
       scheduledAt: parsedScheduledAt,
@@ -197,11 +204,11 @@ export async function POST(req: NextRequest) {
 
     if (newPost.status === 'SCHEDULED' && newPost.scheduledAt) {
       try {
-        await scheduleLinkedInPost(newPost._id.toString(), newPost.scheduledAt);
+        await schedulePost(newPost._id.toString(), newPost.scheduledAt, newPost.targetPlatform);
       } catch (error) {
         newPost.status = 'FAILED';
         newPost.publishing = {
-          platform: 'LINKEDIN',
+          platform: newPost.targetPlatform,
           error: error instanceof Error ? error.message : 'Failed to schedule post.',
         };
         await newPost.save();
@@ -257,7 +264,8 @@ export async function POST(req: NextRequest) {
               }
             : null,
           content: newPost.content,
-                    platform: newPost.platform,
+          platform: newPost.platform,
+          targetPlatform: newPost.targetPlatform,
           mediaIds: cleanMediaIds,
           media: mediaList,
           status: newPost.status,

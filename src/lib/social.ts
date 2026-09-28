@@ -3,6 +3,7 @@ import { UserRole } from '@/models/WorkspaceMember';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_COOKIE_NAME = 'linkedin_oauth_state';
+export const INSTAGRAM_STATE_COOKIE_NAME = 'instagram_oauth_state';
 
 interface OAuthStatePayload {
   nonce: string;

@@ -127,9 +127,13 @@ function SocialAccountRow({
 
 export default function SocialAccountsPage() {
   const [account, setAccount] = useState<LinkedInAccount | null>(null);
+  const [instagramAccount, setInstagramAccount] = useState<LinkedInAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [instagramLoading, setInstagramLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [instagramDisconnecting, setInstagramDisconnecting] = useState(false);
+  const [instagramConnecting, setInstagramConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -156,6 +160,19 @@ export default function SocialAccountsPage() {
         if (active) setLoading(false);
       });
 
+    fetch('/api/social/instagram')
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load social accounts.');
+        if (active) setInstagramAccount(data.account || null);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Unable to load social accounts.');
+      })
+      .finally(() => {
+        if (active) setInstagramLoading(false);
+      });
+
     return () => {
       active = false;
       if (errorUpdate) window.clearTimeout(errorUpdate);
@@ -177,7 +194,23 @@ export default function SocialAccountsPage() {
     }
   };
 
+  const disconnectInstagram = async () => {
+    setInstagramDisconnecting(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/social/instagram', { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to disconnect Instagram.');
+      setInstagramAccount(null);
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'Unable to disconnect Instagram.');
+    } finally {
+      setInstagramDisconnecting(false);
+    }
+  };
+
   const connected = account?.status === 'CONNECTED';
+  const instagramConnected = instagramAccount?.status === 'CONNECTED';
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#090d16' }}>
@@ -312,7 +345,20 @@ export default function SocialAccountsPage() {
               disconnecting={disconnecting}
               connecting={connecting}
             />
-            <SocialAccountRow name="Instagram" icon={<InstagramBrandMark size={40} />} connected={false} available={false} />
+            <SocialAccountRow
+              name="Instagram"
+              icon={<InstagramBrandMark size={40} />}
+              connected={instagramConnected}
+              loading={instagramLoading}
+              accountName={instagramAccount?.accountName ? `Connected as ${instagramAccount.accountName}` : undefined}
+              onConnect={() => {
+                setInstagramConnecting(true);
+                window.location.href = '/api/social/instagram/connect';
+              }}
+              onDisconnect={disconnectInstagram}
+              disconnecting={instagramDisconnecting}
+              connecting={instagramConnecting}
+            />
             <SocialAccountRow name="Facebook" icon={<FacebookBrandMark size={40} />} connected={false} available={false} />
           </div>
         </div>

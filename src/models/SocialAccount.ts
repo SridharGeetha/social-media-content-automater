@@ -1,6 +1,6 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
-export type SocialPlatform = 'LINKEDIN';
+export type SocialPlatform = 'LINKEDIN' | 'INSTAGRAM';
 export type SocialAccountStatus = 'CONNECTED' | 'DISCONNECTED';
 
 export interface ISocialAccount extends Document {
@@ -20,7 +20,7 @@ export interface ISocialAccount extends Document {
 const SocialAccountSchema: Schema<ISocialAccount> = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
-    platform: { type: String, enum: ['LINKEDIN'], required: true },
+    platform: { type: String, enum: ['LINKEDIN', 'INSTAGRAM'], required: true },
     accountId: { type: String, required: true },
     accountName: { type: String, required: true },
     encryptedAccessToken: { type: String, required: true, select: false },

@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import connectToDatabase from '@/lib/db';
 import Post from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
-import { scheduleLinkedInPost } from '@/lib/qstash';
+import { schedulePost } from '@/lib/qstash';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -51,11 +51,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (post.status === 'SCHEDULED' && post.scheduledAt) {
       try {
-        await scheduleLinkedInPost(post._id.toString(), post.scheduledAt);
+        await schedulePost(post._id.toString(), post.scheduledAt, post.targetPlatform || 'LINKEDIN');
       } catch (error) {
         post.status = 'FAILED';
         post.publishing = {
-          platform: 'LINKEDIN',
+          platform: post.targetPlatform || 'LINKEDIN',
           error: error instanceof Error ? error.message : 'Failed to schedule approved post.',
         };
         await post.save();
