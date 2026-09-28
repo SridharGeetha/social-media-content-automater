@@ -55,19 +55,21 @@ describe('Instagram API helpers', () => {
   it('creates and publishes an image container', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(Response.json({ id: 'container-1' }))
+      .mockResolvedValueOnce(Response.json({ status_code: 'FINISHED', status: 'Finished' }))
       .mockResolvedValueOnce(Response.json({ id: 'published-1' }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(publishInstagramImagePost('token', 'ig-user-7', 'Caption', 'https://cdn.example.com/photo.jpg'))
+    await expect(publishInstagramImagePost('token', 'ig-user-7', 'Caption', 'https://res.cloudinary.com/demo/image/upload/photo.png'))
       .resolves.toBe('published-1');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(String(fetchMock.mock.calls[0][0])).toContain('/ig-user-7/media');
-    expect(String(fetchMock.mock.calls[1][0])).toContain('/ig-user-7/media_publish');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/container-1?fields=status_code%2Cstatus');
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/ig-user-7/media_publish');
     expect(fetchMock.mock.calls[0][1]?.body).toEqual(new URLSearchParams({
       caption: 'Caption',
-      image_url: 'https://cdn.example.com/photo.jpg',
+      image_url: 'https://res.cloudinary.com/demo/image/upload/f_jpg/photo.png',
     }));
-    expect(fetchMock.mock.calls[1][1]?.body).toEqual(new URLSearchParams({ creation_id: 'container-1' }));
+    expect(fetchMock.mock.calls[2][1]?.body).toEqual(new URLSearchParams({ creation_id: 'container-1' }));
   });
 
   it('returns a clear Graph API error when container creation is rejected', async () => {
@@ -77,8 +79,24 @@ describe('Instagram API helpers', () => {
     ));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(publishInstagramImagePost('token', 'ig-user-7', 'Caption', 'https://cdn.example.com/photo.jpg'))
+    await expect(publishInstagramImagePost('token', 'ig-user-7', 'Caption', 'https://res.cloudinary.com/demo/image/upload/photo.jpg'))
       .rejects.toThrow('Image URL is not accessible.');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not publish a container while Instagram reports it is still processing', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ id: 'container-2' }))
+      .mockResolvedValueOnce(Response.json({ status_code: 'IN_PROGRESS', status: 'Processing' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(publishInstagramImagePost(
+      'token',
+      'ig-user-7',
+      'Caption',
+      'https://res.cloudinary.com/demo/image/upload/photo.webp'
+    )).rejects.toThrow('not ready to publish (IN_PROGRESS): Processing');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('/media_publish');
   });
 });

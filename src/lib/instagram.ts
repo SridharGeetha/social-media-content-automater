@@ -143,13 +143,42 @@ async function createImageMediaContainer(
   return result.id;
 }
 
+async function verifyImageContainerReady(accessToken: string, containerId: string): Promise<void> {
+  const url = graphUrl(encodeURIComponent(containerId));
+  url.searchParams.set('fields', 'status_code,status');
+
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) {
+    throw new Error(await readError(response, `Instagram image container status check failed with status ${response.status}.`));
+  }
+
+  const result = (await response.json()) as { status_code?: string; status?: string };
+  if (result.status_code !== 'FINISHED') {
+    const state = result.status_code || 'UNKNOWN';
+    const description = result.status ? `: ${result.status}` : '';
+    throw new Error(`Instagram image container is not ready to publish (${state})${description}.`);
+  }
+}
+
+function asInstagramJpegUrl(imageUrl: string): string {
+  const url = new URL(imageUrl);
+  if (url.hostname !== 'res.cloudinary.com' || !url.pathname.includes('/image/upload/')) {
+    throw new Error('Instagram publishing requires a Cloudinary-hosted image so it can be delivered as JPEG.');
+  }
+
+  url.pathname = url.pathname.replace('/image/upload/', '/image/upload/f_jpg/');
+  return url.toString();
+}
+
 export async function publishInstagramImagePost(
   accessToken: string,
   accountId: string,
   caption: string,
   imageUrl: string
 ): Promise<string> {
-  const containerId = await createImageMediaContainer(accessToken, accountId, caption, imageUrl);
+  const jpegUrl = asInstagramJpegUrl(imageUrl);
+  const containerId = await createImageMediaContainer(accessToken, accountId, caption, jpegUrl);
+  await verifyImageContainerReady(accessToken, containerId);
 
   const url = graphUrl(`${encodeURIComponent(accountId)}/media_publish`);
   const response = await fetch(url, {
