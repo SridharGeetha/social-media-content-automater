@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   postFindOneAndUpdate: vi.fn(),
   postUpdateOne: vi.fn(),
   publishPostToInstagram: vi.fn(),
+  createInstagramContainerForPost: vi.fn(),
+  getInstagramContainerStatusForPost: vi.fn(),
+  publishInstagramContainerForPost: vi.fn(),
+  scheduleInstagramContainerRetry: vi.fn(),
   receiverVerify: vi.fn(),
 }));
 
@@ -20,8 +24,17 @@ vi.mock('@/models/Post', () => ({ default: {
   findOneAndUpdate: mocks.postFindOneAndUpdate,
   updateOne: mocks.postUpdateOne,
 } }));
-vi.mock('@/lib/publish-instagram-post', () => ({ publishPostToInstagram: mocks.publishPostToInstagram }));
-vi.mock('@/lib/qstash', () => ({ getQStashReceiver: () => ({ verify: mocks.receiverVerify }) }));
+vi.mock('@/lib/publish-instagram-post', () => ({
+  publishPostToInstagram: mocks.publishPostToInstagram,
+  createInstagramContainerForPost: mocks.createInstagramContainerForPost,
+  getInstagramContainerStatusForPost: mocks.getInstagramContainerStatusForPost,
+  publishInstagramContainerForPost: mocks.publishInstagramContainerForPost,
+}));
+vi.mock('@/lib/qstash', () => ({
+  getQStashReceiver: () => ({ verify: mocks.receiverVerify }),
+  scheduleInstagramContainerRetry: mocks.scheduleInstagramContainerRetry,
+  INSTAGRAM_CONTAINER_RETRY_LIMIT: 5,
+}));
 
 import { POST as publishNow } from '@/app/api/posts/[id]/instagram/route';
 import { POST as publishScheduled } from '@/app/api/publish/instagram/route';
@@ -36,23 +49,52 @@ function makePost(status: string) {
     content: 'Caption',
     mediaIds: ['media-a'],
     status,
-    publishing: undefined as { platform: string; externalPostId?: string; publishedAt?: Date } | undefined,
+    scheduledAt: null as Date | null,
+    updatedAt: new Date(),
+    publishing: undefined as { platform: string; externalPostId?: string; containerId?: string; publishedAt?: Date; startedAt?: Date } | undefined,
     save: vi.fn().mockResolvedValue(undefined),
   };
 }
 
+let scheduledPost: ReturnType<typeof makePost> | undefined;
+
 describe('Instagram publishing routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scheduledPost = undefined;
     mocks.auth.mockResolvedValue({ user: { id: 'user-a' } });
     mocks.connectToDatabase.mockResolvedValue(undefined);
     mocks.memberFindOne.mockReturnValue({ sort: vi.fn().mockResolvedValue(adminMembership) });
     mocks.publishPostToInstagram.mockResolvedValue('instagram-media-a');
+    mocks.createInstagramContainerForPost.mockResolvedValue('instagram-container-a');
+    mocks.getInstagramContainerStatusForPost.mockResolvedValue({ statusCode: 'FINISHED', status: 'Finished' });
+    mocks.publishInstagramContainerForPost.mockResolvedValue('instagram-media-a');
+    mocks.scheduleInstagramContainerRetry.mockResolvedValue('qstash-retry-a');
     mocks.postFindOneAndUpdate.mockImplementation(async (_filter, update) => ({
-      ...makePost('PROCESSING'),
-      ...update.$set,
+      ...(scheduledPost || makePost('PROCESSING')),
+      status: 'PROCESSING',
+      publishing: {
+        platform: 'INSTAGRAM',
+        startedAt: update.$set['publishing.startedAt'],
+        containerId: scheduledPost?.publishing?.containerId,
+      },
     }));
-    mocks.postUpdateOne.mockResolvedValue({ matchedCount: 1 });
+    mocks.postUpdateOne.mockImplementation(async (_filter, update) => {
+      if (scheduledPost) {
+        if (update.$set.status) scheduledPost.status = update.$set.status;
+        if (update.$set['publishing.containerId']) {
+          scheduledPost.publishing = { ...scheduledPost.publishing, platform: 'INSTAGRAM', containerId: update.$set['publishing.containerId'] };
+        }
+        if (update.$set['publishing.externalPostId']) {
+          scheduledPost.publishing = {
+            platform: 'INSTAGRAM',
+            externalPostId: update.$set['publishing.externalPostId'],
+            publishedAt: update.$set['publishing.publishedAt'],
+          };
+        }
+      }
+      return { matchedCount: 1 };
+    });
     mocks.receiverVerify.mockResolvedValue(true);
   });
 
@@ -130,6 +172,7 @@ describe('Instagram publishing routes', () => {
 
   it('publishes a scheduled Instagram post and is idempotent after success', async () => {
     const post = makePost('SCHEDULED');
+    scheduledPost = post;
     mocks.postFindOne.mockResolvedValue(post);
     const makeRequest = () => new NextRequest('http://localhost:3000/api/publish/instagram', {
       method: 'POST',
@@ -146,6 +189,140 @@ describe('Instagram publishing routes', () => {
     expect(body.postId).toBe('instagram-media-a');
     expect(post.status).toBe('PUBLISHED');
     expect(post.publishing).toMatchObject({ platform: 'INSTAGRAM', externalPostId: 'instagram-media-a' });
-    expect(mocks.publishPostToInstagram).toHaveBeenCalledTimes(1);
+    expect(mocks.publishInstagramContainerForPost).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an old QStash delivery after the schedule was changed', async () => {
+    const post = makePost('SCHEDULED');
+    post.scheduledAt = new Date('2026-10-01T12:00:00.000Z');
+    mocks.postFindOne.mockResolvedValue(post);
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a', scheduledAt: '2026-10-01T11:00:00.000Z' }),
+    });
+    const response = await publishScheduled(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.message).toContain('outdated');
+    expect(mocks.postFindOneAndUpdate).not.toHaveBeenCalled();
+    expect(mocks.publishPostToInstagram).not.toHaveBeenCalled();
+  });
+
+  it('defers the same container when Instagram reports IN_PROGRESS', async () => {
+    const post = makePost('SCHEDULED');
+    scheduledPost = post;
+    mocks.postFindOne.mockResolvedValue(post);
+    mocks.getInstagramContainerStatusForPost.mockResolvedValue({ statusCode: 'IN_PROGRESS', status: 'IN_PROGRESS' });
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a' }),
+    });
+    const response = await publishScheduled(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe('SCHEDULED');
+    expect(body.message).toContain('follow-up check');
+    expect(mocks.scheduleInstagramContainerRetry).toHaveBeenCalledWith(
+      'post-a',
+      expect.any(Date),
+      'instagram-container-a',
+      1
+    );
+    expect(mocks.publishInstagramContainerForPost).not.toHaveBeenCalled();
+    expect(scheduledPost?.publishing?.containerId).toBe('instagram-container-a');
+  });
+
+  it('resumes a queued container status check without creating another container', async () => {
+    const post = makePost('SCHEDULED');
+    post.publishing = { platform: 'INSTAGRAM', containerId: 'instagram-container-existing' };
+    scheduledPost = post;
+    mocks.postFindOne.mockResolvedValue(post);
+    mocks.getInstagramContainerStatusForPost.mockResolvedValue({ statusCode: 'FINISHED', status: 'FINISHED' });
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a', containerId: 'instagram-container-existing', retryAttempt: 1 }),
+    });
+    const response = await publishScheduled(request);
+
+    expect(response.status).toBe(200);
+    expect(mocks.createInstagramContainerForPost).not.toHaveBeenCalled();
+    expect(mocks.getInstagramContainerStatusForPost).toHaveBeenCalledWith(expect.anything(), 'instagram-container-existing');
+    expect(mocks.publishInstagramContainerForPost).toHaveBeenCalledWith(expect.anything(), 'instagram-container-existing');
+  });
+
+  it('fails with a useful status after the container retry budget is exhausted', async () => {
+    const post = makePost('SCHEDULED');
+    post.publishing = { platform: 'INSTAGRAM', containerId: 'instagram-container-old' };
+    scheduledPost = post;
+    mocks.postFindOne.mockResolvedValue(post);
+    mocks.getInstagramContainerStatusForPost.mockResolvedValue({ statusCode: 'IN_PROGRESS', status: 'IN_PROGRESS' });
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a', containerId: 'instagram-container-old', retryAttempt: 5 }),
+    });
+    const response = await publishScheduled(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe('FAILED');
+    expect(body.message).toContain('remained IN_PROGRESS');
+    expect(mocks.scheduleInstagramContainerRetry).not.toHaveBeenCalled();
+    expect(scheduledPost?.status).toBe('FAILED');
+  });
+
+  it('asks QStash to retry while a fresh processing lease is active', async () => {
+    const post = makePost('PROCESSING');
+    post.updatedAt = new Date();
+    post.publishing = { platform: 'INSTAGRAM', startedAt: new Date() };
+    mocks.postFindOne.mockResolvedValue(post);
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a' }),
+    });
+    const response = await publishScheduled(request);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('30');
+    expect(mocks.postFindOneAndUpdate).not.toHaveBeenCalled();
+    expect(mocks.publishPostToInstagram).not.toHaveBeenCalled();
+  });
+
+  it('reclaims a processing post whose lease expired after an interrupted invocation', async () => {
+    const post = makePost('PROCESSING');
+    post.updatedAt = new Date(Date.now() - 6 * 60 * 1000);
+    post.publishing = { platform: 'INSTAGRAM', startedAt: new Date(Date.now() - 6 * 60 * 1000) };
+    mocks.postFindOne.mockResolvedValue(post);
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a' }),
+    });
+    const response = await publishScheduled(request);
+
+    expect(response.status).toBe(200);
+    expect(mocks.postFindOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'PROCESSING',
+        updatedAt: expect.objectContaining({ $lte: expect.any(Date) }),
+      }),
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: 'PROCESSING', 'publishing.startedAt': expect.any(Date) }),
+      }),
+      { new: true }
+    );
+    expect(mocks.publishInstagramContainerForPost).toHaveBeenCalledTimes(1);
   });
 });

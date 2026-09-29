@@ -1,10 +1,17 @@
 import { decryptSocialToken } from '@/lib/social';
-import { publishInstagramImagePost } from '@/lib/instagram';
+import {
+  createInstagramImageContainer,
+  getInstagramImageContainerStatus,
+  publishInstagramImageContainer,
+  publishInstagramImagePost,
+} from '@/lib/instagram';
 import Media from '@/models/Media';
 import SocialAccount from '@/models/SocialAccount';
 import type { IPost } from '@/models/Post';
 
-export async function publishPostToInstagram(post: Pick<IPost, 'content' | 'workspaceId' | 'mediaIds'>): Promise<string> {
+type InstagramPost = Pick<IPost, 'content' | 'workspaceId' | 'mediaIds'>;
+
+async function getInstagramPostContext(post: InstagramPost) {
   if (!Array.isArray(post.mediaIds) || post.mediaIds.length !== 1) {
     throw new Error('Instagram image publishing requires exactly one attached image.');
   }
@@ -34,6 +41,33 @@ export async function publishPostToInstagram(post: Pick<IPost, 'content' | 'work
     throw new Error('Instagram media must be available at a public HTTPS URL.');
   }
 
-  const accessToken = decryptSocialToken(account.encryptedAccessToken);
-  return publishInstagramImagePost(accessToken, account.accountId, post.content.trim(), mediaUrl.toString());
+  return {
+    accessToken: decryptSocialToken(account.encryptedAccessToken),
+    accountId: account.accountId,
+    caption: post.content.trim(),
+    imageUrl: mediaUrl.toString(),
+  };
+}
+
+export async function createInstagramContainerForPost(post: InstagramPost): Promise<string> {
+  const context = await getInstagramPostContext(post);
+  return createInstagramImageContainer(context.accessToken, context.accountId, context.caption, context.imageUrl);
+}
+
+export async function getInstagramContainerStatusForPost(
+  post: InstagramPost,
+  containerId: string
+): Promise<{ statusCode: string; status?: string }> {
+  const context = await getInstagramPostContext(post);
+  return getInstagramImageContainerStatus(context.accessToken, containerId);
+}
+
+export async function publishInstagramContainerForPost(post: InstagramPost, containerId: string): Promise<string> {
+  const context = await getInstagramPostContext(post);
+  return publishInstagramImageContainer(context.accessToken, context.accountId, containerId);
+}
+
+export async function publishPostToInstagram(post: InstagramPost): Promise<string> {
+  const context = await getInstagramPostContext(post);
+  return publishInstagramImagePost(context.accessToken, context.accountId, context.caption, context.imageUrl);
 }

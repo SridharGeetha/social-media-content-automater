@@ -54,13 +54,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       try {
         await schedulePost(post._id.toString(), post.scheduledAt, post.targetPlatform || 'LINKEDIN');
       } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Failed to schedule approved post.';
         post.status = 'FAILED';
         post.publishing = {
           platform: post.targetPlatform || 'LINKEDIN',
-          error: error instanceof Error ? error.message : 'Failed to schedule approved post.',
+          error: reason,
         };
         await post.save();
-        return NextResponse.json({ error: 'Post was approved but could not be scheduled.' }, { status: 502 });
+        return NextResponse.json({ error: `Post was approved but could not be scheduled: ${reason}`, details: reason }, { status: 502 });
       }
     }
 

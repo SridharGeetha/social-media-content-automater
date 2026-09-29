@@ -97,6 +97,7 @@ export async function GET(
         status: post.status,
         scheduledAt: post.scheduledAt ? post.scheduledAt.toISOString() : null,
         publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
+        publishingError: post.publishing?.error || null,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
         rejectionFeedback: post.rejectionFeedback || null,
@@ -192,10 +193,17 @@ export async function PATCH(
       if (currentMember.role === 'MANAGER' && ['PUBLISHED', 'PROCESSING', 'FAILED'].includes(upperStatus)) {
         return NextResponse.json({ error: 'Managers cannot set publishing lifecycle states directly.' }, { status: 403 });
       }
-      if ((currentMember.role === 'MANAGER' || currentMember.role === 'ADMIN') && upperStatus === 'SCHEDULED' && post.status !== 'APPROVED') {
+      const isInstagramScheduleRetry = currentMember.role === 'ADMIN' &&
+        post.targetPlatform === 'INSTAGRAM' && post.status === 'FAILED' && upperStatus === 'SCHEDULED';
+      if ((currentMember.role === 'MANAGER' || currentMember.role === 'ADMIN') &&
+        upperStatus === 'SCHEDULED' && post.status !== 'APPROVED' && !isInstagramScheduleRetry) {
         return NextResponse.json({ error: 'Only approved posts can be scheduled.' }, { status: 409 });
       }
       post.status = upperStatus;
+
+      if (isInstagramScheduleRetry) {
+        post.publishing = { platform: 'INSTAGRAM' };
+      }
 
       if (upperStatus === 'PUBLISHED' && !post.publishedAt) {
         post.publishedAt = new Date();
@@ -234,13 +242,14 @@ export async function PATCH(
       try {
         await schedulePost(post._id.toString(), post.scheduledAt, post.targetPlatform || 'LINKEDIN');
       } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Failed to schedule post.';
         post.status = 'FAILED';
         post.publishing = {
           platform: post.targetPlatform || 'LINKEDIN',
-          error: error instanceof Error ? error.message : 'Failed to schedule post.',
+          error: reason,
         };
         await post.save();
-        return NextResponse.json({ error: 'Post was updated but could not be scheduled.' }, { status: 502 });
+        return NextResponse.json({ error: `Post was updated but could not be scheduled: ${reason}`, details: reason }, { status: 502 });
       }
     }
 
@@ -304,6 +313,7 @@ export async function PATCH(
         status: post.status,
         scheduledAt: post.scheduledAt ? post.scheduledAt.toISOString() : null,
         publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
+        publishingError: post.publishing?.error || null,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
         rejectionFeedback: post.rejectionFeedback || null,

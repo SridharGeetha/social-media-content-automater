@@ -1,6 +1,8 @@
 const INSTAGRAM_AUTHORIZE_URL = 'https://www.instagram.com/oauth/authorize';
 const INSTAGRAM_TOKEN_URL = 'https://api.instagram.com/oauth/access_token';
 const INSTAGRAM_GRAPH_URL = 'https://graph.instagram.com';
+const IMAGE_CONTAINER_STATUS_ATTEMPTS = 5;
+const IMAGE_CONTAINER_STATUS_INTERVAL_MS = 1000;
 
 interface InstagramTokenResponse {
   access_token?: string;
@@ -116,14 +118,14 @@ export async function fetchInstagramProfile(accessToken: string): Promise<Instag
   return profile;
 }
 
-async function createImageMediaContainer(
+export async function createInstagramImageContainer(
   accessToken: string,
   accountId: string,
   caption: string,
   imageUrl: string
 ): Promise<string> {
   const url = graphUrl(`${encodeURIComponent(accountId)}/media`);
-  const body = new URLSearchParams({ caption, image_url: imageUrl });
+  const body = new URLSearchParams({ caption, image_url: asInstagramJpegUrl(imageUrl) });
 
   const response = await fetch(url, {
     method: 'POST',
@@ -143,21 +145,60 @@ async function createImageMediaContainer(
   return result.id;
 }
 
-async function verifyImageContainerReady(accessToken: string, containerId: string): Promise<void> {
+export async function getInstagramImageContainerStatus(
+  accessToken: string,
+  containerId: string
+): Promise<{ statusCode: string; status?: string }> {
   const url = graphUrl(encodeURIComponent(containerId));
   url.searchParams.set('fields', 'status_code,status');
-
   const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!response.ok) {
     throw new Error(await readError(response, `Instagram image container status check failed with status ${response.status}.`));
   }
 
   const result = (await response.json()) as { status_code?: string; status?: string };
-  if (result.status_code !== 'FINISHED') {
-    const state = result.status_code || 'UNKNOWN';
-    const description = result.status ? `: ${result.status}` : '';
-    throw new Error(`Instagram image container is not ready to publish (${state})${description}.`);
+  return { statusCode: result.status_code || 'UNKNOWN', status: result.status };
+}
+
+export async function publishInstagramImageContainer(
+  accessToken: string,
+  accountId: string,
+  containerId: string
+): Promise<string> {
+  const url = graphUrl(`${encodeURIComponent(accountId)}/media_publish`);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ creation_id: containerId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response, `Instagram publish failed with status ${response.status}.`));
   }
+
+  const result = (await response.json()) as { id?: string };
+  if (!result.id) throw new Error('Instagram publish response did not include a media ID.');
+  return result.id;
+}
+
+async function verifyImageContainerReady(accessToken: string, containerId: string): Promise<void> {
+  for (let attempt = 0; attempt < IMAGE_CONTAINER_STATUS_ATTEMPTS; attempt += 1) {
+    const result = await getInstagramImageContainerStatus(accessToken, containerId);
+    if (result.statusCode === 'FINISHED') return;
+    if (result.statusCode === 'ERROR' || result.statusCode === 'EXPIRED') {
+      const description = result.status ? `: ${result.status}` : '';
+      throw new Error(`Instagram image container cannot be published (${result.statusCode})${description}.`);
+    }
+
+    if (attempt < IMAGE_CONTAINER_STATUS_ATTEMPTS - 1) {
+      await new Promise((resolve) => setTimeout(resolve, IMAGE_CONTAINER_STATUS_INTERVAL_MS));
+    }
+  }
+
+  throw new Error(`Instagram image container was not ready after ${IMAGE_CONTAINER_STATUS_ATTEMPTS} checks. Try publishing again shortly.`);
 }
 
 function asInstagramJpegUrl(imageUrl: string): string {
@@ -176,25 +217,7 @@ export async function publishInstagramImagePost(
   caption: string,
   imageUrl: string
 ): Promise<string> {
-  const jpegUrl = asInstagramJpegUrl(imageUrl);
-  const containerId = await createImageMediaContainer(accessToken, accountId, caption, jpegUrl);
+  const containerId = await createInstagramImageContainer(accessToken, accountId, caption, imageUrl);
   await verifyImageContainerReady(accessToken, containerId);
-
-  const url = graphUrl(`${encodeURIComponent(accountId)}/media_publish`);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({ creation_id: containerId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(await readError(response, `Instagram publish failed with status ${response.status}.`));
-  }
-
-  const result = (await response.json()) as { id?: string };
-  if (!result.id) throw new Error('Instagram publish response did not include a media ID.');
-  return result.id;
+  return publishInstagramImageContainer(accessToken, accountId, containerId);
 }

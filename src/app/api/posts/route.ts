@@ -101,6 +101,7 @@ export async function GET(req: NextRequest) {
         status: post.status,
         scheduledAt: post.scheduledAt ? post.scheduledAt.toISOString() : null,
         publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
+        publishingError: post.publishing?.error || null,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
         rejectionFeedback: post.rejectionFeedback || null,
@@ -206,13 +207,14 @@ export async function POST(req: NextRequest) {
       try {
         await schedulePost(newPost._id.toString(), newPost.scheduledAt, newPost.targetPlatform);
       } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Failed to schedule post.';
         newPost.status = 'FAILED';
         newPost.publishing = {
           platform: newPost.targetPlatform,
-          error: error instanceof Error ? error.message : 'Failed to schedule post.',
+          error: reason,
         };
         await newPost.save();
-        return NextResponse.json({ error: 'Post was created but could not be scheduled.' }, { status: 502 });
+        return NextResponse.json({ error: `Post was created but could not be scheduled: ${reason}`, details: reason }, { status: 502 });
       }
     }
 
@@ -271,6 +273,7 @@ export async function POST(req: NextRequest) {
           status: newPost.status,
           scheduledAt: newPost.scheduledAt ? newPost.scheduledAt.toISOString() : null,
           publishedAt: newPost.publishedAt ? newPost.publishedAt.toISOString() : null,
+          publishingError: newPost.publishing?.error || null,
           createdAt: newPost.createdAt.toISOString(),
           updatedAt: newPost.updatedAt.toISOString(),
           rejectionFeedback: newPost.rejectionFeedback || null,

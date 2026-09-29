@@ -87,7 +87,8 @@ describe('Instagram API helpers', () => {
   it('does not publish a container while Instagram reports it is still processing', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(Response.json({ id: 'container-2' }))
-      .mockResolvedValueOnce(Response.json({ status_code: 'IN_PROGRESS', status: 'Processing' }));
+      .mockResolvedValueOnce(Response.json({ status_code: 'IN_PROGRESS', status: 'Processing' }))
+      .mockResolvedValueOnce(Response.json({ status_code: 'ERROR', status: 'Processing failed' }));
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(publishInstagramImagePost(
@@ -95,8 +96,55 @@ describe('Instagram API helpers', () => {
       'ig-user-7',
       'Caption',
       'https://res.cloudinary.com/demo/image/upload/photo.webp'
-    )).rejects.toThrow('not ready to publish (IN_PROGRESS): Processing');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0][0])).not.toContain('/media_publish');
+    )).rejects.toThrow('cannot be published (ERROR): Processing failed');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2][0])).not.toContain('/media_publish');
+  });
+
+  it('waits briefly for an image container to finish processing before publishing', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ id: 'container-3' }))
+      .mockResolvedValueOnce(Response.json({ status_code: 'IN_PROGRESS', status: 'Processing' }))
+      .mockResolvedValueOnce(Response.json({ status_code: 'FINISHED', status: 'Finished' }))
+      .mockResolvedValueOnce(Response.json({ id: 'published-3' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const publishPromise = publishInstagramImagePost(
+      'token',
+      'ig-user-7',
+      'Caption',
+      'https://res.cloudinary.com/demo/image/upload/photo.jpg'
+    );
+    await vi.runAllTimersAsync();
+
+    await expect(publishPromise).resolves.toBe('published-3');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(String(fetchMock.mock.calls[3][0])).toContain('/media_publish');
+  });
+
+  it('returns a retryable message when the image container stays in progress', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ id: 'container-4' }))
+      .mockImplementation(async () => Response.json({ status_code: 'IN_PROGRESS', status: 'Processing' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const publishPromise = publishInstagramImagePost(
+      'token',
+      'ig-user-7',
+      'Caption',
+      'https://res.cloudinary.com/demo/image/upload/photo.jpg'
+    );
+    const settled = publishPromise.then(
+      () => ({ error: null }),
+      (error: unknown) => ({ error })
+    );
+    await vi.runAllTimersAsync();
+    const outcome = await settled;
+
+    expect(outcome.error).toBeInstanceOf(Error);
+    expect((outcome.error as Error).message).toContain('Try publishing again shortly.');
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 });

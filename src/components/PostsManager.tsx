@@ -45,6 +45,7 @@ export interface PostItem {
   status: PostStatus;
   scheduledAt: string | null;
   publishedAt: string | null;
+  publishingError?: string | null;
   createdAt: string;
   updatedAt: string;
   rejectionFeedback?: string | null;
@@ -490,7 +491,18 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                         )}
                       </td>
 
-                      <td style={{ padding: '16px 20px' }}>{renderStatusBadge(post.status)}</td>
+                      <td style={{ padding: '16px 20px' }}>
+                        {renderStatusBadge(post.status)}
+                        {post.status === 'FAILED' && post.publishingError && (
+                          <div
+                            title={post.publishingError}
+                            style={{ color: '#fca5a5', fontSize: '0.75rem', lineHeight: 1.4, marginTop: '6px', maxWidth: '260px', overflowWrap: 'anywhere' }}
+                            role="alert"
+                          >
+                            {post.publishingError}
+                          </div>
+                        )}
+                      </td>
 
                       <td style={{ padding: '16px 20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -880,6 +892,13 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                 <div style={{ background: 'rgba(127, 29, 29, 0.18)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(248, 113, 113, 0.3)', color: '#fecaca' }}>
                   <strong>Manager feedback</strong>
                   <div style={{ marginTop: '6px', whiteSpace: 'pre-wrap' }}>{viewingPost.rejectionFeedback}</div>
+                </div>
+              )}
+
+              {viewingPost.publishingError && (
+                <div style={{ background: 'rgba(127, 29, 29, 0.18)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(248, 113, 113, 0.3)', color: '#fecaca' }} role="alert">
+                  <strong>Publishing error</strong>
+                  <div style={{ marginTop: '6px', whiteSpace: 'pre-wrap' }}>{viewingPost.publishingError}</div>
                 </div>
               )}
 

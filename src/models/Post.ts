@@ -8,7 +8,9 @@ const POST_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJ
 export interface IPostPublishing {
   platform: PostTargetPlatform;
   externalPostId?: string;
+  containerId?: string;
   publishedAt?: Date;
+  startedAt?: Date;
   error?: string;
 }
 
@@ -51,7 +53,9 @@ const PostSchema: Schema<IPost> = new Schema(
     publishing: {
       platform: { type: String, enum: ['LINKEDIN', 'INSTAGRAM'] },
       externalPostId: { type: String },
+      containerId: { type: String },
       publishedAt: { type: Date },
+      startedAt: { type: Date },
       error: { type: String },
     },
     rejectionFeedback: { type: String, default: null },
