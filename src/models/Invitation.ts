@@ -12,6 +12,7 @@ export interface IInvitation extends Document {
   status: InvitationStatus;
   invitedBy: mongoose.Types.ObjectId;
   createdAt: Date;
+  updatedAt?: Date;
   expiresAt: Date;
 }
 

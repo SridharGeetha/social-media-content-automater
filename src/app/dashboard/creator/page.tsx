@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary, { MediaItem } from '@/components/MediaLibrary';
+import NotificationDropdown from '@/components/NotificationDropdown';
 
 export default function CreatorDashboard() {
   const { data: session } = useSession();
@@ -203,10 +204,17 @@ export default function CreatorDashboard() {
               Draft engaging social posts, submit for Manager approval, and upload media assets.
             </p>
           </div>
-          <button onClick={() => setActiveTab('new')} className="btn-primary" style={{ background: 'linear-gradient(135deg, #A5D86A 0%, #4F912A 100%)', color: '#10210d' }}>
-            <Sparkles style={{ width: '18px', height: '18px' }} />
-            + New Post Draft
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <NotificationDropdown
+              userRole="CREATOR"
+              currentUserId={session?.user?.id}
+              onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            />
+            <button onClick={() => setActiveTab('new')} className="btn-primary" style={{ background: 'linear-gradient(135deg, #A5D86A 0%, #4F912A 100%)', color: '#10210d' }}>
+              <Sparkles style={{ width: '18px', height: '18px' }} />
+              + New Post Draft
+            </button>
+          </div>
         </div>
 
         {/* MY DRAFTS & POSTS TAB */}

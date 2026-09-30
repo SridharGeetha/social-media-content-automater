@@ -19,13 +19,16 @@ import {
   Globe2,
   UserCircle,
   Plus,
-  Save
+  Save,
+  Pencil,
+  X
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
 import { DashboardSkeleton } from '@/components/LoadingSkeleton';
 import SocialAccountsPanel from '@/components/SocialAccountsPanel';
 import AdminPostAnalytics from '@/components/AdminPostAnalytics';
+import NotificationDropdown from '@/components/NotificationDropdown';
 
 
 interface Member {
@@ -56,6 +59,10 @@ export default function AdminDashboard() {
   const { data: session } = useSession();
   const isSocialAccountsActive = activeTab === 'social';
   const [workspace, setWorkspace] = useState<{ id: string; name: string; slug: string } | null>(null);
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState('');
+  const [editingWorkspaceName, setEditingWorkspaceName] = useState(false);
+  const [savingWorkspaceName, setSavingWorkspaceName] = useState(false);
+  const [workspaceNameError, setWorkspaceNameError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +88,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setWorkspace(data.workspace);
+        setWorkspaceNameDraft(data.workspace?.name || '');
         setMembers(data.members || []);
         setInvitations(data.invitations || []);
       }
@@ -138,6 +146,35 @@ export default function AdminDashboard() {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const saveWorkspaceName = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = workspaceNameDraft.trim();
+    if (!name) {
+      setWorkspaceNameError('Workspace name is required.');
+      return;
+    }
+
+    setSavingWorkspaceName(true);
+    setWorkspaceNameError(null);
+    try {
+      const response = await fetch('/api/workspace', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to update workspace name.');
+
+      setWorkspace(data.workspace);
+      setWorkspaceNameDraft(data.workspace.name);
+      setEditingWorkspaceName(false);
+    } catch (error) {
+      setWorkspaceNameError(error instanceof Error ? error.message : 'Unable to update workspace name.');
+    } finally {
+      setSavingWorkspaceName(false);
+    }
   };
 
   return (
@@ -327,7 +364,7 @@ export default function AdminDashboard() {
         {/* Top Header */}
         <div className="dashboard-top-header admin-dashboard-top-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 400, color: '#ffffff' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 400, color: '#ffffff' }}>
               {activeTab === 'overview' && 'Workspace Overview'}
               {activeTab === 'members' && 'Team Members & Role Invitations'}
               {activeTab === 'content' && 'Content Overview'}
@@ -356,18 +393,11 @@ export default function AdminDashboard() {
                 </button>
               </>
             )}
-            <div role="img" aria-label="3 notifications" title="3 notifications" style={{ position: 'relative', width: '36px', height: '36px', display: 'grid', placeItems: 'center', color: '#B9E769' }}>
-              <svg aria-hidden="true" viewBox="0 0 512 512" style={{ width: '28px', height: '28px', display: 'block' }}>
-                <path d="M313 42H95A53 53 0 0 0 42 95V303c0 64 32 101 96 101h43c15 0 23 7 33 21l25 34c9 13 26 13 35 0l26-34c10-14 18-21 33-21 90 0 137-45 137-123v-67" fill="none" stroke="currentColor" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="416" cy="96" r="53" fill="none" stroke="currentColor" strokeWidth="32" />
-                <circle cx="170" cy="234" r="22" fill="currentColor" />
-                <circle cx="256" cy="234" r="22" fill="currentColor" />
-                <circle cx="342" cy="234" r="22" fill="currentColor" />
-              </svg>
-              <span aria-hidden="true" style={{ position: 'absolute', top: '-2px', right: '-2px', minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: '9999px', background: '#991b1b', color: '#ffffff', fontSize: '0.65rem', fontWeight: 700, lineHeight: '16px', textAlign: 'center', boxSizing: 'border-box' }}>
-                3
-              </span>
-            </div>
+            <NotificationDropdown
+              userRole="ADMIN"
+              currentUserId={session?.user?.id}
+              onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            />
           </div>
         </div>
 
@@ -500,30 +530,58 @@ export default function AdminDashboard() {
                 <div className="glass-panel" style={{ padding: '28px', background: 'rgba(255, 255, 255, 0.035)', border: '1px solid rgba(231, 225, 177, 0.16)', boxShadow: '0 12px 32px rgba(0, 0, 0, 0.18)' }}>
                   <h3 style={{ fontSize: '1.45rem', color: '#F9F2DA', marginBottom: '8px', fontWeight: 800 }}>Workspace Settings</h3>
                   <p style={{ color: '#C9C19A', fontSize: '0.92rem', marginBottom: '24px' }}>
-                    Manage workspace details, authentication policies, and team permissions.
+                    Update your workspace name.
                   </p>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px', marginBottom: '18px' }}>
-                    <div style={{ padding: '18px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#C9C19A', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Workspace</div>
-                      <div style={{ fontSize: '1.2rem', color: '#F9F2DA', fontWeight: 800 }}>{workspace?.name || 'Workspace'}</div>
+                  <form onSubmit={saveWorkspaceName} style={{ maxWidth: '560px' }}>
+                    <label htmlFor="workspace-name" className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Workspace Name</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <input
+                        id="workspace-name"
+                        type="text"
+                        value={workspaceNameDraft}
+                        onChange={(event) => setWorkspaceNameDraft(event.target.value)}
+                        disabled={!editingWorkspaceName || savingWorkspaceName}
+                        className="input-field"
+                        style={{ flex: '1 1 260px', background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
+                      />
+                      {editingWorkspaceName ? (
+                        <>
+                          <button type="submit" className="btn-primary" disabled={savingWorkspaceName} style={{ padding: '10px 14px' }}>
+                            {savingWorkspaceName ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Save style={{ width: '16px', height: '16px' }} />}
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            disabled={savingWorkspaceName}
+                            onClick={() => {
+                              setWorkspaceNameDraft(workspace?.name || '');
+                              setWorkspaceNameError(null);
+                              setEditingWorkspaceName(false);
+                            }}
+                            style={{ padding: '10px 14px' }}
+                          >
+                            <X style={{ width: '16px', height: '16px' }} />
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => {
+                            setWorkspaceNameError(null);
+                            setEditingWorkspaceName(true);
+                          }}
+                          style={{ padding: '10px 14px' }}
+                        >
+                          <Pencil style={{ width: '16px', height: '16px' }} />
+                          Edit
+                        </button>
+                      )}
                     </div>
-                    <div style={{ padding: '18px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#C9C19A', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Slug</div>
-                      <div style={{ fontSize: '1.1rem', color: '#F9F2DA', fontWeight: 700 }}>{workspace?.slug || 'workspace'}</div>
-                    </div>
-                  </div>
-
-                  <div style={{ maxWidth: '560px' }}>
-                    <div style={{ marginBottom: '16px' }}>
-                      <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Workspace Name</label>
-                      <input type="text" readOnly value={workspace?.name || ''} className="input-field" style={{ opacity: 0.8, background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }} />
-                    </div>
-                    <div style={{ marginBottom: '16px' }}>
-                      <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Slug</label>
-                      <input type="text" readOnly value={workspace?.slug || ''} className="input-field" style={{ opacity: 0.8, background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }} />
-                    </div>
-                  </div>
+                    {workspaceNameError && <p role="alert" style={{ color: '#fecaca', fontSize: '0.82rem', margin: '8px 0 0' }}>{workspaceNameError}</p>}
+                  </form>
                 </div>
 
                 <div className="glass-panel" style={{ padding: '24px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.16)' }}>

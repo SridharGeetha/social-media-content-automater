@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
+import NotificationDropdown from '@/components/NotificationDropdown';
 
 export default function ManagerDashboard() {
   const { data: session } = useSession();
@@ -178,7 +179,14 @@ export default function ManagerDashboard() {
               Review creator submissions, organize social campaigns, and manage publishing timelines.
             </p>
           </div>
-          <span className="role-badge role-manager" style={{ background: 'rgba(48, 109, 41, 0.12)', color: '#0D530E', borderColor: 'rgba(48, 109, 41, 0.3)' }}>Active Role: MANAGER</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <NotificationDropdown
+              userRole="MANAGER"
+              currentUserId={session?.user?.id}
+              onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            />
+            <span className="role-badge role-manager" style={{ background: 'rgba(48, 109, 41, 0.12)', color: '#0D530E', borderColor: 'rgba(48, 109, 41, 0.3)' }}>Active Role: MANAGER</span>
+          </div>
         </div>
 
         {/* Live Posts Management Tab */}
