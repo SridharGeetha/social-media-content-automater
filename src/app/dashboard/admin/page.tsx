@@ -1,33 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { 
   Users, 
-  ShieldCheck, 
   Send, 
   Layers, 
   LogOut, 
   Copy, 
   Check, 
-  Plus, 
-  Clock, 
   UserCheck, 
   FileText, 
   Settings as SettingsIcon, 
-  ExternalLink,
   AlertCircle,
   Loader2,
   Film,
   Globe2,
-  UserCircle
+  UserCircle,
+  Plus,
+  Save
 } from 'lucide-react';
 import PostsManager from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
 import { DashboardSkeleton } from '@/components/LoadingSkeleton';
 import SocialAccountsPanel from '@/components/SocialAccountsPanel';
+import AdminPostAnalytics from '@/components/AdminPostAnalytics';
 
 
 interface Member {
@@ -53,6 +51,8 @@ interface Invitation {
 export default function AdminDashboard() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'content' | 'media' | 'social' | 'settings'>('overview');
+  const [createPostTrigger, setCreatePostTrigger] = useState(0);
+  const [createPostStatus, setCreatePostStatus] = useState<'DRAFT' | 'SCHEDULED'>('DRAFT');
   const { data: session } = useSession();
   const isSocialAccountsActive = activeTab === 'social';
   const [workspace, setWorkspace] = useState<{ id: string; name: string; slug: string } | null>(null);
@@ -323,11 +323,11 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="dashboard-main-content" style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
+      <main className="dashboard-main-content admin-dashboard-main" style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
         {/* Top Header */}
-        <div className="dashboard-top-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+        <div className="dashboard-top-header admin-dashboard-top-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f8fafc' }}>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 400, color: '#ffffff' }}>
               {activeTab === 'overview' && 'Workspace Overview'}
               {activeTab === 'members' && 'Team Members & Role Invitations'}
               {activeTab === 'content' && 'Content Overview'}
@@ -337,19 +337,38 @@ export default function AdminDashboard() {
             </h1>
           </div>
 
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="btn-primary"
-            style={{
-              background: 'rgba(48, 109, 41, 0.18)',
-              color: '#E7E1B1',
-              border: '1px solid rgba(185, 231, 105, 0.38)',
-              boxShadow: 'none',
-            }}
-          >
-            <Plus style={{ width: '18px', height: '18px', color: '#B9E769' }} />
-            Invite Team Member
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {activeTab === 'members' && (
+              <button type="button" onClick={() => setShowInviteModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+                <Send style={{ width: '14px', height: '14px' }} />
+                Send New Invitation
+              </button>
+            )}
+            {activeTab === 'content' && !loading && (
+              <>
+                <button type="button" onClick={() => { setCreatePostStatus('DRAFT'); setCreatePostTrigger((value) => value + 1); }} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1' }}>
+                  <Save style={{ width: '14px', height: '14px' }} />
+                  Save Draft
+                </button>
+                <button type="button" onClick={() => { setCreatePostStatus('DRAFT'); setCreatePostTrigger((value) => value + 1); }} className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.85rem' }}>
+                  <Plus style={{ width: '16px', height: '16px' }} />
+                  Create Post
+                </button>
+              </>
+            )}
+            <div role="img" aria-label="3 notifications" title="3 notifications" style={{ position: 'relative', width: '36px', height: '36px', display: 'grid', placeItems: 'center', color: '#B9E769' }}>
+              <svg aria-hidden="true" viewBox="0 0 512 512" style={{ width: '28px', height: '28px', display: 'block' }}>
+                <path d="M313 42H95A53 53 0 0 0 42 95V303c0 64 32 101 96 101h43c15 0 23 7 33 21l25 34c9 13 26 13 35 0l26-34c10-14 18-21 33-21 90 0 137-45 137-123v-67" fill="none" stroke="currentColor" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="416" cy="96" r="53" fill="none" stroke="currentColor" strokeWidth="32" />
+                <circle cx="170" cy="234" r="22" fill="currentColor" />
+                <circle cx="256" cy="234" r="22" fill="currentColor" />
+                <circle cx="342" cy="234" r="22" fill="currentColor" />
+              </svg>
+              <span aria-hidden="true" style={{ position: 'absolute', top: '-2px', right: '-2px', minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: '9999px', background: '#991b1b', color: '#ffffff', fontSize: '0.65rem', fontWeight: 700, lineHeight: '16px', textAlign: 'center', boxSizing: 'border-box' }}>
+                3
+              </span>
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -358,150 +377,19 @@ export default function AdminDashboard() {
           <>
             {/* OVERVIEW TAB */}
             {activeTab === 'overview' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="animate-fade-in">
-                {/* Stats Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
-                  <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <span style={{ color: '#E7E1B1', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em' }}>TOTAL TEAM MEMBERS</span>
-                      <Users style={{ color: '#B9E769' }} />
-                    </div>
-                    <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#FBF5DD' }}>{members.length}</div>
-                    <span style={{ fontSize: '0.78rem', color: '#8BD48A', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
-                      <Check style={{ width: '14px', height: '14px' }} /> Active workspace seats
-                    </span>
-                  </div>
-
-                  <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <span style={{ color: '#E7E1B1', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em' }}>PENDING INVITATIONS</span>
-                      <Clock style={{ color: '#E7E1B1' }} />
-                    </div>
-                    <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#FBF5DD' }}>
-                      {invitations.filter((i) => i.status === 'PENDING').length}
-                    </div>
-                    <span style={{ fontSize: '0.78rem', color: '#C9C19A', marginTop: '8px', display: 'block' }}>
-                      Awaiting user registration
-                    </span>
-                  </div>
-
-                  <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <span style={{ color: '#E7E1B1', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em' }}>YOUR ROLE</span>
-                      <ShieldCheck style={{ color: '#B9E769' }} />
-                    </div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#B9E769' }}>ADMIN</div>
-                    <span style={{ fontSize: '0.78rem', color: '#C9C19A', marginTop: '8px', display: 'block' }}>
-                      Full administrative access
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Invite & Recent Members */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-                  {/* Recent Members Panel */}
-                  <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                      <h3 style={{ fontSize: '1.1rem', color: '#FBF5DD', margin: 0 }}>Active Team Members</h3>
-                      <button onClick={() => setActiveTab('members')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.2)', borderColor: 'rgba(185, 231, 105, 0.35)' }}>
-                        View All
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {members.slice(0, 5).map((m) => (
-                        <div
-                          key={m.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '12px 16px',
-                            borderRadius: '10px',
-                            background: 'rgba(48, 109, 41, 0.12)',
-                            border: '1px solid rgba(185, 231, 105, 0.18)',
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#FBF5DD', fontSize: '0.92rem' }}>{m.name}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#C9C19A' }}>{m.email}</div>
-                          </div>
-                          <span className={`role-badge role-${m.role.toLowerCase()}`}>{m.role}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Pending Invites List */}
-                  <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                      <h3 style={{ fontSize: '1.1rem', color: '#FBF5DD', margin: 0 }}>Pending Invitations</h3>
-                      <button onClick={() => setShowInviteModal(true)} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                        + Send Invite
-                      </button>
-                    </div>
-
-                    {invitations.filter((i) => i.status === 'PENDING').length === 0 ? (
-                      <p style={{ color: '#C9C19A', fontSize: '0.88rem', padding: '20px 0', textAlign: 'center' }}>
-                        No pending invitations. Click &quot;Invite Team Member&quot; to add teammates!
-                      </p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {invitations
-                          .filter((i) => i.status === 'PENDING')
-                          .slice(0, 4)
-                          .map((inv) => (
-                            <div
-                              key={inv.id}
-                              style={{
-                                padding: '12px 16px',
-                                borderRadius: '10px',
-                                background: 'rgba(48, 109, 41, 0.12)',
-                                border: '1px solid rgba(185, 231, 105, 0.12)',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                <div>
-                                  <div style={{ fontWeight: 700, color: '#FBF5DD', fontSize: '0.9rem' }}>{inv.email}</div>
-                                  <span className={`role-badge role-${inv.role.toLowerCase()}`} style={{ fontSize: '0.65rem', marginTop: '4px' }}>
-                                    Role: {inv.role}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => copyToClipboard(inv.invitationUrl, inv.id)}
-                                  className="btn-secondary"
-                                  style={{ padding: '6px 10px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(185, 231, 105, 0.28)' }}
-                                >
-                                  {copiedId === inv.id ? (
-                                    <>
-                                      <Check style={{ width: '12px', height: '12px', color: '#8BD48A' }} />
-                                      Copied
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy style={{ width: '12px', height: '12px' }} />
-                                      Copy Link
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }} className="animate-fade-in">
+                <AdminPostAnalytics members={members} />
               </div>
             )}
 
             {/* TEAM MEMBERS TAB */}
             {activeTab === 'members' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
+              <div className="admin-overview-details admin-member-sections animate-fade-in">
                 {/* Active Members Table */}
-                <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
+                <section aria-labelledby="workspace-members-title" style={{ padding: '18px 0', borderBottom: '1px solid rgba(231, 225, 177, 0.16)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '18px', flexWrap: 'wrap' }}>
                     <div>
-                      <h3 style={{ fontSize: '1.2rem', color: '#FBF5DD', marginBottom: '4px' }}>Workspace Members</h3>
+                      <h2 id="workspace-members-title" style={{ margin: '0 0 14px', color: '#FBF5DD', fontSize: '1.05rem', fontWeight: 700 }}>Workspace Members</h2>
                       <p style={{ fontSize: '0.82rem', color: '#C9C19A', margin: 0 }}>People currently assigned to this workspace.</p>
                     </div>
                   </div>
@@ -512,39 +400,31 @@ export default function AdminDashboard() {
                         <tr style={{ borderBottom: '1px solid rgba(185, 231, 105, 0.16)', color: '#B9E769', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           <th style={{ padding: '12px 14px' }}>Member Name</th>
                           <th style={{ padding: '12px 14px' }}>Email Address</th>
-                          <th style={{ padding: '12px 14px' }}>Assigned Role</th>
-                          <th style={{ padding: '12px 14px' }}>Joined Date</th>
+                          <th style={{ padding: '12px 14px' }}>Role</th>
                         </tr>
                       </thead>
                       <tbody>
                         {members.map((m) => (
                           <tr key={m.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '15px 14px', fontWeight: 700, color: '#FBF5DD' }}>{m.name}</td>
+                            <td style={{ padding: '15px 14px', color: '#FBF5DD' }}>{m.name}</td>
                             <td style={{ padding: '15px 14px', color: '#D7D1AD' }}>{m.email}</td>
                             <td style={{ padding: '15px 14px' }}>
-                              <span className={`role-badge role-${m.role.toLowerCase()}`}>{m.role}</span>
-                            </td>
-                            <td style={{ padding: '15px 14px', color: '#C9C19A', fontSize: '0.86rem' }}>
-                              {new Date(m.joinedAt).toLocaleDateString()}
+                              <span className={`role-badge role-${m.role.toLowerCase()}`} style={{ fontWeight: 400 }}>{m.role}</span>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </section>
 
                 {/* Invitations Table */}
-                <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
+                <section aria-labelledby="team-invitations-title" style={{ padding: '18px 0', borderBottom: '1px solid rgba(231, 225, 177, 0.16)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '18px', flexWrap: 'wrap' }}>
                     <div>
-                      <h3 style={{ fontSize: '1.2rem', color: '#FBF5DD', marginBottom: '4px' }}>Team Invitations</h3>
+                      <h2 id="team-invitations-title" style={{ margin: '0 0 14px', color: '#FBF5DD', fontSize: '1.05rem', fontWeight: 700 }}>Team Invitations</h2>
                       <p style={{ fontSize: '0.82rem', color: '#C9C19A', margin: 0 }}>Invite links for pending teammates and workspace access.</p>
                     </div>
-                    <button onClick={() => setShowInviteModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-                      <Send style={{ width: '14px', height: '14px' }} />
-                      Send New Invitation
-                    </button>
                   </div>
 
                   <div style={{ overflowX: 'auto' }}>
@@ -552,34 +432,34 @@ export default function AdminDashboard() {
                       <thead>
                         <tr style={{ borderBottom: '1px solid rgba(185, 231, 105, 0.16)', color: '#B9E769', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           <th style={{ padding: '12px 14px' }}>Invited Email</th>
-                          <th style={{ padding: '12px 14px' }}>Assigned Role</th>
+                          <th style={{ padding: '12px 14px' }}>Role</th>
                           <th style={{ padding: '12px 14px' }}>Status</th>
-                          <th style={{ padding: '12px 14px' }}>Invitation Link</th>
+                          <th style={{ padding: '12px 14px' }}>Link</th>
                         </tr>
                       </thead>
                       <tbody>
                         {invitations.map((inv) => (
                           <tr key={inv.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '15px 14px', fontWeight: 700, color: '#FBF5DD' }}>{inv.email}</td>
+                            <td style={{ padding: '15px 14px', color: '#FBF5DD' }}>{inv.email}</td>
                             <td style={{ padding: '15px 14px' }}>
-                              <span className={`role-badge role-${inv.role.toLowerCase()}`}>{inv.role}</span>
+                              <span className={`role-badge role-${inv.role.toLowerCase()}`} style={{ fontWeight: 400 }}>{inv.role}</span>
                             </td>
                             <td style={{ padding: '15px 14px' }}>
-                              <span className={`role-badge status-${inv.status.toLowerCase()}`}>{inv.status}</span>
+                              <span className={`role-badge status-${inv.status.toLowerCase()}`} style={{ fontWeight: 400 }}>{inv.status}</span>
                             </td>
                             <td style={{ padding: '15px 14px' }}>
                               <button
                                 onClick={() => copyToClipboard(inv.invitationUrl, `table-${inv.id}`)}
-                                className="btn-secondary"
-                                style={{ padding: '7px 12px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.32)' }}
+                                aria-label={copiedId === `table-${inv.id}` ? 'Copied' : 'Copy'}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: 0, border: 'none', background: 'transparent', color: copiedId === `table-${inv.id}` ? '#8BD48A' : '#FBF5DD', font: 'inherit', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                               >
                                 {copiedId === `table-${inv.id}` ? (
                                   <>
-                                    <Check style={{ width: '14px', height: '14px', color: '#34d399' }} /> Copied
+                                    <Check style={{ width: '14px', height: '14px' }} /> Copied
                                   </>
                                 ) : (
                                   <>
-                                    <Copy style={{ width: '14px', height: '14px' }} /> Copy Invite Link
+                                    <Copy style={{ width: '14px', height: '14px' }} /> Copy
                                   </>
                                 )}
                               </button>
@@ -589,14 +469,14 @@ export default function AdminDashboard() {
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </section>
               </div>
             )}
 
             {/* CONTENT TAB */}
             {activeTab === 'content' && (
               <div className="animate-fade-in">
-                <PostsManager userRole="ADMIN" />
+                <PostsManager userRole="ADMIN" createPostTrigger={createPostTrigger} createPostStatus={createPostStatus} />
               </div>
             )}
 
@@ -617,18 +497,18 @@ export default function AdminDashboard() {
             {/* SETTINGS TAB */}
             {activeTab === 'settings' && (
               <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div className="glass-panel" style={{ padding: '28px', background: 'linear-gradient(135deg, rgba(10, 30, 14, 0.9) 0%, rgba(16, 45, 22, 0.92) 100%)', border: '1px solid rgba(185, 231, 105, 0.2)', boxShadow: '0 14px 35px rgba(17, 40, 21, 0.2)' }}>
+                <div className="glass-panel" style={{ padding: '28px', background: 'rgba(255, 255, 255, 0.035)', border: '1px solid rgba(231, 225, 177, 0.16)', boxShadow: '0 12px 32px rgba(0, 0, 0, 0.18)' }}>
                   <h3 style={{ fontSize: '1.45rem', color: '#F9F2DA', marginBottom: '8px', fontWeight: 800 }}>Workspace Settings</h3>
                   <p style={{ color: '#C9C19A', fontSize: '0.92rem', marginBottom: '24px' }}>
                     Manage workspace details, authentication policies, and team permissions.
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px', marginBottom: '18px' }}>
-                    <div style={{ padding: '18px', borderRadius: '14px', background: 'rgba(11, 28, 16, 0.75)', border: '1px solid rgba(185, 231, 105, 0.14)' }}>
+                    <div style={{ padding: '18px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
                       <div style={{ fontSize: '0.72rem', color: '#C9C19A', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Workspace</div>
                       <div style={{ fontSize: '1.2rem', color: '#F9F2DA', fontWeight: 800 }}>{workspace?.name || 'Workspace'}</div>
                     </div>
-                    <div style={{ padding: '18px', borderRadius: '14px', background: 'rgba(11, 28, 16, 0.75)', border: '1px solid rgba(185, 231, 105, 0.14)' }}>
+                    <div style={{ padding: '18px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
                       <div style={{ fontSize: '0.72rem', color: '#C9C19A', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Slug</div>
                       <div style={{ fontSize: '1.1rem', color: '#F9F2DA', fontWeight: 700 }}>{workspace?.slug || 'workspace'}</div>
                     </div>
@@ -646,18 +526,18 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '24px', background: 'rgba(8, 17, 12, 0.72)', border: '1px solid rgba(185, 231, 105, 0.14)' }}>
+                <div className="glass-panel" style={{ padding: '24px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.16)' }}>
                   <h4 style={{ fontSize: '1rem', color: '#F9F2DA', marginBottom: '14px', fontWeight: 800 }}>Access Overview</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-                    <div style={{ padding: '14px', borderRadius: '12px', background: 'rgba(17, 41, 22, 0.7)', border: '1px solid rgba(185, 231, 105, 0.12)' }}>
+                    <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
                       <div style={{ color: '#C9C19A', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Admins</div>
                       <div style={{ color: '#F9F2DA', fontWeight: 800, fontSize: '1.25rem', marginTop: '6px' }}>1</div>
                     </div>
-                    <div style={{ padding: '14px', borderRadius: '12px', background: 'rgba(17, 41, 22, 0.7)', border: '1px solid rgba(185, 231, 105, 0.12)' }}>
+                    <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
                       <div style={{ color: '#C9C19A', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Managers</div>
                       <div style={{ color: '#F9F2DA', fontWeight: 800, fontSize: '1.25rem', marginTop: '6px' }}>2</div>
                     </div>
-                    <div style={{ padding: '14px', borderRadius: '12px', background: 'rgba(17, 41, 22, 0.7)', border: '1px solid rgba(185, 231, 105, 0.12)' }}>
+                    <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.12)' }}>
                       <div style={{ color: '#C9C19A', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Creators</div>
                       <div style={{ color: '#F9F2DA', fontWeight: 800, fontSize: '1.25rem', marginTop: '6px' }}>4</div>
                     </div>

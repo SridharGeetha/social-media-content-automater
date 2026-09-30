@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { AlertCircle, CheckCircle2, Link2, Loader2 } from 'lucide-react';
+import { AlertCircle, Link2, Loader2 } from 'lucide-react';
 
 interface LinkedInAccount {
   accountName: string;
@@ -26,7 +26,7 @@ function FacebookBrandMark({ size = 40 }: { size?: number }) {
 }
 
 function AccountRow({ name, icon, connected, accountName, loading, connecting, disconnecting, available, onConnect, onDisconnect }: { name: string; icon: ReactNode; connected: boolean; accountName?: string; loading?: boolean; connecting?: boolean; disconnecting?: boolean; available?: boolean; onConnect?: () => void; onDisconnect?: () => void }) {
-  return <article className="social-account-row"><div className="social-account-identity"><div className="social-account-icon">{icon}</div><div><h2>{name}</h2>{loading ? <p className="social-account-status status-checking"><Loader2 className="animate-spin" style={{ width: '14px', height: '14px' }} /> Checking connection</p> : connected ? <p className="social-account-status status-connected"><CheckCircle2 style={{ width: '14px', height: '14px' }} />Connected{accountName ? ` as ${accountName}` : ''}</p> : <p className="social-account-status status-disconnected">Disconnected</p>}</div></div><button type="button" onClick={connected ? onDisconnect : onConnect} disabled={loading || connecting || disconnecting || !available} aria-busy={connecting || disconnecting} className="social-account-action" aria-label={`${connected ? 'Disconnect' : 'Connect'} ${name}`} title={available ? `${connected ? 'Disconnect' : 'Connect'} ${name}` : `${name} integration coming soon`}>{connecting || disconnecting ? <Loader2 className="animate-spin" /> : <img src={connected ? 'https://img.icons8.com/?size=50&id=35634&format=png' : 'https://img.icons8.com/windows/96/NOMBEuDJxrui/connected.png'} alt="" width="24" height="24" className={connected ? 'social-account-disconnect-icon' : 'social-account-connect-icon'} />}</button></article>;
+  return <article className="social-account-row"><div className="social-account-identity"><div className="social-account-icon">{icon}</div><div><h2>{name}</h2>{loading ? <p className="social-account-status status-checking"><Loader2 className="animate-spin" style={{ width: '14px', height: '14px' }} /> Checking connection</p> : connected ? <p className="social-account-status status-connected">Connected{accountName ? ` as ${accountName}` : ''}</p> : <p className="social-account-status status-disconnected">Disconnected</p>}</div></div><button type="button" onClick={connected ? onDisconnect : onConnect} disabled={loading || connecting || disconnecting || !available} aria-busy={connecting || disconnecting} className="social-account-action" aria-label={`${connected ? 'Disconnect' : 'Connect'} ${name}`} title={available ? `${connected ? 'Disconnect' : 'Connect'} ${name}` : `${name} integration coming soon`}>{connecting || disconnecting ? <Loader2 className="animate-spin" /> : <img src={connected ? 'https://img.icons8.com/?size=50&id=35634&format=png' : 'https://img.icons8.com/windows/96/NOMBEuDJxrui/connected.png'} alt="" width="24" height="24" className={connected ? 'social-account-disconnect-icon' : 'social-account-connect-icon'} />}</button></article>;
 }
 
 export default function SocialAccountsPanel() {

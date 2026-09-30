@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus,
   FileText,
@@ -13,6 +14,7 @@ import {
   Eye,
   Calendar,
   Layers,
+  Link2,
   Send,
   Save,
   X,
@@ -51,10 +53,73 @@ export interface PostItem {
   rejectionFeedback?: string | null;
 }
 
+type ComposerPlatformId = string;
+type PlatformConnectionStatus = 'checking' | 'connected' | 'disconnected' | 'unavailable';
+type PlatformOption = {
+  id: ComposerPlatformId;
+  name: string;
+  icon: React.ReactNode;
+  statusUrl: string | null;
+  connectUrl: string | null;
+  targetPlatform: string | null;
+  publishRoute: string | null;
+};
+
+const PLATFORM_OPTIONS: PlatformOption[] = [
+  {
+    id: 'LINKEDIN',
+    name: 'LinkedIn',
+    icon: <span className="composer-platform-icon composer-platform-icon-linkedin">in</span>,
+    statusUrl: '/api/social/linkedin',
+    connectUrl: '/api/social/linkedin/connect',
+    targetPlatform: 'LINKEDIN',
+    publishRoute: 'linkedin',
+  },
+  {
+    id: 'INSTAGRAM',
+    name: 'Instagram',
+    icon: (
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="composer-platform-icon composer-platform-icon-instagram">
+        <defs>
+          <linearGradient id="composer-instagram-gradient" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#FFDC80" />
+            <stop offset="0.5" stopColor="#E1306C" />
+            <stop offset="1" stopColor="#833AB4" />
+          </linearGradient>
+        </defs>
+        <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#composer-instagram-gradient)" />
+        <rect x="6.4" y="6.4" width="11.2" height="11.2" rx="3.2" fill="none" stroke="#ffffff" strokeWidth="1.7" />
+        <circle cx="12" cy="12" r="2.6" fill="none" stroke="#ffffff" strokeWidth="1.7" />
+        <circle cx="16.5" cy="7.6" r="1" fill="#ffffff" />
+      </svg>
+    ),
+    statusUrl: '/api/social/instagram',
+    connectUrl: '/api/social/instagram/connect',
+    targetPlatform: 'INSTAGRAM',
+    publishRoute: 'instagram',
+  },
+  {
+    id: 'FACEBOOK',
+    name: 'Facebook',
+    icon: <span className="composer-platform-icon composer-platform-icon-facebook">f</span>,
+    statusUrl: null,
+    connectUrl: null,
+    targetPlatform: null,
+    publishRoute: null,
+  },
+];
+
+const INITIAL_PLATFORM_CONNECTIONS = PLATFORM_OPTIONS.reduce<Record<ComposerPlatformId, PlatformConnectionStatus>>((connections, platform) => {
+  connections[platform.id] = platform.statusUrl ? 'checking' : 'unavailable';
+  return connections;
+}, {});
+
 interface PostsManagerProps {
   userRole?: 'ADMIN' | 'MANAGER' | 'CREATOR';
   currentUserId?: string;
   initialStatus?: string;
+  createPostTrigger?: number;
+  createPostStatus?: PostStatus;
 }
 
 const STATUS_TABS: { label: string; value: string }[] = [
@@ -70,7 +135,7 @@ const STATUS_TABS: { label: string; value: string }[] = [
   { label: 'Failed', value: 'FAILED' },
 ];
 
-export default function PostsManager({ userRole, currentUserId, initialStatus = 'ALL' }: PostsManagerProps) {
+export default function PostsManager({ userRole, currentUserId, initialStatus = 'ALL', createPostTrigger, createPostStatus }: PostsManagerProps) {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>(initialStatus);
   const [loading, setLoading] = useState<boolean>(true);
@@ -78,6 +143,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
 
   // Modal States
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const handledCreatePostTrigger = useRef(createPostTrigger);
   const [viewingPost, setViewingPost] = useState<PostItem | null>(null);
   const [editingPost, setEditingPost] = useState<PostItem | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
@@ -90,12 +156,42 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     scheduledAt: '',
     targetPlatform: 'LINKEDIN' as 'LINKEDIN' | 'INSTAGRAM',
   });
+  const [selectedComposerPlatforms, setSelectedComposerPlatforms] = useState<ComposerPlatformId[]>(['LINKEDIN']);
+  const [platformConnections, setPlatformConnections] = useState<Record<ComposerPlatformId, PlatformConnectionStatus>>(INITIAL_PLATFORM_CONNECTIONS);
+  const [schedulePost, setSchedulePost] = useState(false);
   const [attachedMedia, setAttachedMedia] = useState<MediaItem[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [directPublishStatus, setDirectPublishStatus] = useState<'publishing' | 'success' | null>(null);
   const [publishingPostId, setPublishingPostId] = useState<string | null>(null);
   const [reviewingPost, setReviewingPost] = useState<PostItem | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewScheduledAt, setReviewScheduledAt] = useState('');
+
+  useEffect(() => {
+    if (userRole !== 'ADMIN') return;
+    let active = true;
+
+    const checkConnections = async () => {
+      const results = await Promise.all(PLATFORM_OPTIONS.map(async (platform) => {
+        if (!platform.statusUrl) return { id: platform.id, status: 'unavailable' as const };
+        try {
+          const response = await fetch(platform.statusUrl);
+          const data = await response.json();
+          return { id: platform.id, status: response.ok && data.connected ? 'connected' as const : 'disconnected' as const };
+        } catch {
+          return { id: platform.id, status: 'disconnected' as const };
+        }
+      }));
+
+      if (!active) return;
+      const nextConnections = { ...INITIAL_PLATFORM_CONNECTIONS };
+      for (const result of results) nextConnections[result.id] = result.status;
+      setPlatformConnections(nextConnections);
+    };
+
+    void checkConnections();
+    return () => { active = false; };
+  }, [userRole]);
 
   // Fetch Posts
   const fetchPosts = useCallback(async () => {
@@ -127,16 +223,25 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
   }, [fetchPosts]);
 
   // Open Create Modal
-  const openCreateModal = (defaultStatus: PostStatus = 'DRAFT') => {
+  const openCreateModal = useCallback((defaultStatus: PostStatus = 'DRAFT') => {
     setFormData({
       content: '',
       status: defaultStatus,
       scheduledAt: '',
       targetPlatform: 'LINKEDIN',
     });
+    setSelectedComposerPlatforms(['LINKEDIN']);
+    setSchedulePost(defaultStatus === 'SCHEDULED');
     setAttachedMedia([]);
     setShowCreateModal(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (createPostTrigger === undefined || createPostTrigger === handledCreatePostTrigger.current) return;
+    handledCreatePostTrigger.current = createPostTrigger;
+    const request = window.setTimeout(() => openCreateModal(createPostStatus ?? 'SCHEDULED'), 0);
+    return () => window.clearTimeout(request);
+  }, [createPostTrigger, createPostStatus, openCreateModal]);
 
   // Open Edit Modal
   const openEditModal = (post: PostItem) => {
@@ -222,6 +327,83 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     }
   };
 
+  const handleAdminComposerSubmit = async (e: React.FormEvent, action: 'DRAFT' | 'PUBLISH' | 'SCHEDULE') => {
+    e.preventDefault();
+    if (!formData.content.trim()) {
+      setErrorMsg('Post content is required.');
+      return;
+    }
+
+    const selectedPlatforms = PLATFORM_OPTIONS.filter((platform) => selectedComposerPlatforms.includes(platform.id));
+    if (selectedPlatforms.length === 0) {
+      setErrorMsg('Select at least one platform.');
+      return;
+    }
+
+    const unsupportedPlatform = selectedPlatforms.find((platform) => !platform.targetPlatform || !platform.publishRoute);
+    if (unsupportedPlatform) {
+      setErrorMsg(`${unsupportedPlatform.name} publishing is not available yet. Deselect it to continue.`);
+      return;
+    }
+
+    if (action !== 'DRAFT') {
+      const disconnectedPlatform = selectedPlatforms.find((platform) => platformConnections[platform.id] !== 'connected');
+      if (disconnectedPlatform) {
+        setErrorMsg(`Connect your ${disconnectedPlatform.name} account before publishing.`);
+        return;
+      }
+    }
+
+    if (action === 'SCHEDULE' && !formData.scheduledAt) {
+      setErrorMsg('Choose a date and time to schedule this post.');
+      return;
+    }
+
+    setSubmitting(true);
+    if (action === 'PUBLISH') setDirectPublishStatus('publishing');
+    setErrorMsg(null);
+    const mediaIdsArray = attachedMedia.map((media) => media.id);
+
+    try {
+      for (const platform of selectedPlatforms) {
+        const response = await fetch('/api/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: formData.content.trim(),
+            mediaIds: mediaIdsArray,
+            targetPlatform: platform.targetPlatform,
+            status: action === 'DRAFT' ? 'DRAFT' : action === 'SCHEDULE' ? 'SCHEDULED' : 'APPROVED',
+            scheduledAt: action === 'SCHEDULE' ? new Date(formData.scheduledAt).toISOString() : null,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Failed to create the ${platform.name} post.`);
+
+        if (action === 'PUBLISH' && platform.publishRoute) {
+          const publishResponse = await fetch(`/api/posts/${data.post.id}/${platform.publishRoute}`, { method: 'POST' });
+          const publishData = await publishResponse.json();
+          if (!publishResponse.ok) throw new Error(publishData.error || `Failed to publish to ${platform.name}.`);
+        }
+      }
+
+      if (action === 'PUBLISH') {
+        setDirectPublishStatus('success');
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1400));
+      }
+      setShowCreateModal(false);
+      setEditingPost(null);
+      setAttachedMedia([]);
+      await fetchPosts();
+    } catch (reason: unknown) {
+      if (action === 'PUBLISH') setDirectPublishStatus(null);
+      setErrorMsg(reason instanceof Error ? reason.message : 'An error occurred while saving the post.');
+    } finally {
+      setSubmitting(false);
+      if (action === 'PUBLISH') setDirectPublishStatus(null);
+    }
+  };
+
   // Handle Delete Post
   const handleDeletePost = async (id: string) => {
     setSubmitting(true);
@@ -289,55 +471,55 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     switch (status) {
       case 'DRAFT':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(201, 193, 154, 0.12)', color: '#C9C19A', border: '1px solid rgba(201, 193, 154, 0.24)' }}>
             <FileText style={{ width: '12px', height: '12px' }} /> DRAFT
           </span>
         );
       case 'PENDING_REVIEW':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(255, 198, 109, 0.12)', color: '#FFC66D', border: '1px solid rgba(255, 198, 109, 0.24)' }}>
             <Clock style={{ width: '12px', height: '12px' }} /> PENDING REVIEW
           </span>
         );
       case 'APPROVED':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(139, 212, 138, 0.12)', color: '#8BD48A', border: '1px solid rgba(139, 212, 138, 0.24)' }}>
             <CheckCircle2 style={{ width: '12px', height: '12px' }} /> APPROVED
           </span>
         );
       case 'REJECTED':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(252, 165, 165, 0.12)', color: '#FCA5A5', border: '1px solid rgba(252, 165, 165, 0.24)' }}>
             <AlertCircle style={{ width: '12px', height: '12px' }} /> REJECTED
           </span>
         );
       case 'SCHEDULED':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(120, 200, 255, 0.12)', color: '#78C8FF', border: '1px solid rgba(120, 200, 255, 0.24)' }}>
             <Clock style={{ width: '12px', height: '12px' }} /> SCHEDULED
           </span>
         );
       case 'QUEUED':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(255, 198, 109, 0.12)', color: '#FFC66D', border: '1px solid rgba(255, 198, 109, 0.24)' }}>
             <Layers style={{ width: '12px', height: '12px' }} /> QUEUED
           </span>
         );
       case 'PROCESSING':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(185, 231, 105, 0.12)', color: '#B9E769', border: '1px solid rgba(185, 231, 105, 0.24)' }}>
             <Loader2 style={{ width: '12px', height: '12px' }} className="animate-spin" /> PROCESSING
           </span>
         );
       case 'PUBLISHED':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(139, 212, 138, 0.12)', color: '#8BD48A', border: '1px solid rgba(139, 212, 138, 0.24)' }}>
             <CheckCircle2 style={{ width: '12px', height: '12px' }} /> PUBLISHED
           </span>
         );
       case 'FAILED':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(252, 165, 165, 0.12)', color: '#FCA5A5', border: '1px solid rgba(252, 165, 165, 0.24)' }}>
             <AlertCircle style={{ width: '12px', height: '12px' }} /> FAILED
           </span>
         );
@@ -345,6 +527,9 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
         return null;
     }
   };
+
+  const isAdminCreate = userRole === 'ADMIN' && !editingPost;
+  const selectedPlatformOptions = PLATFORM_OPTIONS.filter((platform) => selectedComposerPlatforms.includes(platform.id));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -362,13 +547,17 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
         </div>
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={() => openCreateModal('DRAFT')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1' }}>
-            <Save style={{ width: '16px', height: '16px' }} /> Save Draft
-          </button>
+          {createPostTrigger === undefined && (
+            <>
+              <button onClick={() => openCreateModal('DRAFT')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1' }}>
+                <Save style={{ width: '16px', height: '16px' }} /> Save Draft
+              </button>
 
-          <button onClick={() => openCreateModal('SCHEDULED')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
-            <Plus style={{ width: '18px', height: '18px' }} /> Create Post
-          </button>
+              <button onClick={() => openCreateModal('SCHEDULED')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
+                <Plus style={{ width: '18px', height: '18px' }} /> Create Post
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -386,8 +575,8 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       )}
 
       {/* Status Filter Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(185, 231, 105, 0.14)' }}>
-        <span style={{ color: '#B9E769', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', marginRight: '6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+      <div className="post-status-filter">
+        <span className="post-status-filter-label">
           <Filter style={{ width: '14px', height: '14px' }} /> Filter:
         </span>
         {STATUS_TABS.map((tab) => {
@@ -396,21 +585,8 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                background: isActive ? 'linear-gradient(135deg, rgba(48, 109, 41, 0.95) 0%, rgba(13, 83, 14, 0.95) 100%)' : 'rgba(15, 23, 42, 0.38)',
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: isActive ? 'rgba(185, 231, 105, 0.4)' : 'rgba(185, 231, 105, 0.12)',
-                color: isActive ? '#FBF5DD' : '#C9C19A',
-                fontWeight: isActive ? 700 : 600,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease',
-              }}
+              className={`post-status-tab${isActive ? ' post-status-tab-active' : ''}`}
+              aria-pressed={isActive}
             >
               {tab.label}
             </button>
@@ -422,7 +598,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       {loading ? (
         <CollectionSkeleton rows={5} />
       ) : posts.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '60px', textAlign: 'center', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
+        <div className="glass-panel" style={{ padding: '60px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.035)', border: '1px solid rgba(231, 225, 177, 0.16)' }}>
           <FileText style={{ width: '40px', height: '40px', color: '#B9E769', margin: '0 auto 16px auto' }} />
           <h3 style={{ fontSize: '1.2rem', color: '#FBF5DD', marginBottom: '8px' }}>No Posts Found</h3>
           <p style={{ color: '#C9C19A', fontSize: '0.88rem', maxWidth: '400px', margin: '0 auto 20px auto' }}>
@@ -435,63 +611,55 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
           </button>
         </div>
       ) : (
-        <div className="glass-panel" style={{ padding: '0', overflow: 'hidden', background: 'rgba(16, 24, 12, 0.82)', border: '1px solid rgba(185, 231, 105, 0.18)' }}>
+        <div className="glass-panel post-management-table-shell" style={{ padding: '0', overflow: 'hidden', background: 'rgba(255, 255, 255, 0.025)', border: '1px solid rgba(231, 225, 177, 0.16)' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="post-management-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(185, 231, 105, 0.16)', backgroundColor: 'rgba(48, 109, 41, 0.12)', color: '#B9E769', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  <th style={{ padding: '16px 20px' }}>Post Content & Media</th>
-                  <th style={{ padding: '16px 20px' }}>Status</th>
-                  <th style={{ padding: '16px 20px' }}>Author</th>
-                  <th style={{ padding: '16px 20px' }}>Schedule / Created</th>
-                  <th style={{ padding: '16px 20px', textAlign: 'right' }}>Actions</th>
+                <tr className="post-management-table-heading">
+                  <th>Image</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                  <th>Author</th>
+                  <th>Scheduled</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {posts.map((post) => {
                   const isOwnerOrManage = userRole === 'ADMIN' || userRole === 'MANAGER' || (currentUserId && post.createdBy === currentUserId);
                   const mediaCount = (post.media && post.media.length) || (post.mediaIds && post.mediaIds.length) || 0;
+                  const previewMedia = post.media?.[0];
 
                   return (
                     <tr
                       key={post.id}
-                      style={{
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                        transition: 'background-color 0.2s ease',
-                      }}
+                      className="post-management-row"
                     >
-                      <td style={{ padding: '16px 20px', maxWidth: '360px' }}>
-                        <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.92rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>
-                          {post.content}
+                      <td className="post-management-image-cell">
+                        <div className="post-management-image">
+                          {previewMedia?.type === 'image' ? (
+                            <img src={previewMedia.secureUrl || previewMedia.cloudinaryUrl} alt="Post attachment" />
+                          ) : previewMedia ? (
+                            <Film aria-label="Video attachment" style={{ width: '22px', height: '22px' }} />
+                          ) : mediaCount > 0 ? (
+                            <ImageIcon aria-label="Post attachments" style={{ width: '22px', height: '22px' }} />
+                          ) : (
+                            <span aria-label="No image attached">—</span>
+                          )}
+                          {mediaCount > 1 && <span className="post-management-image-count">+{mediaCount - 1}</span>}
                         </div>
-                        {mediaCount > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                            {post.media && post.media.length > 0 ? (
-                              post.media.slice(0, 3).map((mItem, idx) => (
-                                <div key={idx} style={{ width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', background: '#020617', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-                                  {mItem.type === 'image' ? (
-                                    <img src={mItem.secureUrl || mItem.cloudinaryUrl} alt="media" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  ) : (
-                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-                                      <Film style={{ width: '18px', height: '18px' }} />
-                                    </div>
-                                  )}
-                                </div>
-                              ))
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#818cf8', fontSize: '0.78rem' }}>
-                                <ImageIcon style={{ width: '13px', height: '13px' }} />
-                                <span>{mediaCount} media attachment{mediaCount > 1 ? 's' : ''}</span>
-                              </div>
-                            )}
-                            {post.media && post.media.length > 3 && (
-                              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>+{post.media.length - 3} more</span>
-                            )}
-                          </div>
+                      </td>
+
+                      <td className="post-management-description-cell">
+                        <div className="post-management-description">{post.content}</div>
+                        {post.content.length > 140 && (
+                          <button type="button" className="post-management-more" onClick={() => setViewingPost(post)} aria-label={`Read full post by ${post.author?.name || 'Unknown User'}`}>
+                            More
+                          </button>
                         )}
                       </td>
 
-                      <td style={{ padding: '16px 20px' }}>
+                      <td className="post-management-status-cell">
                         {renderStatusBadge(post.status)}
                         {post.status === 'FAILED' && post.publishingError && (
                           <div
@@ -504,40 +672,36 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                         )}
                       </td>
 
-                      <td style={{ padding: '16px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', fontSize: '0.75rem', fontWeight: 700 }}>
+                      <td className="post-management-author-cell">
+                        <div className="post-management-author">
+                          <div className="post-management-author-avatar">
                             {post.author?.name ? post.author.name.charAt(0).toUpperCase() : <UserIcon style={{ width: '14px', height: '14px' }} />}
                           </div>
-                          <div>
-                            <div style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 500 }}>{post.author?.name || 'Unknown User'}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{post.author?.email}</div>
-                          </div>
+                          <span className="post-management-author-copy">
+                            <span>{post.author?.name || 'Unknown User'}</span>
+                            <span className="post-management-created-date">Created {new Date(post.createdAt).toLocaleDateString()}</span>
+                          </span>
                         </div>
                       </td>
 
-                      <td style={{ padding: '16px 20px', color: '#94a3b8', fontSize: '0.82rem' }}>
-                        {post.status === 'SCHEDULED' && post.scheduledAt ? (
-                          <div style={{ color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock style={{ width: '13px', height: '13px' }} />
-                            {new Date(post.scheduledAt).toLocaleString()}
-                          </div>
-                        ) : post.status === 'PUBLISHED' && post.publishedAt ? (
-                          <div style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle2 style={{ width: '13px', height: '13px' }} />
-                            {new Date(post.publishedAt).toLocaleString()}
+                      <td className="post-management-date-cell">
+                        {post.scheduledAt || (post.status === 'PUBLISHED' ? post.publishedAt : null) ? (
+                          <div className="post-management-scheduled-date">
+                            {post.status === 'PUBLISHED' && !post.scheduledAt ? <CheckCircle2 style={{ width: '13px', height: '13px' }} /> : <Clock style={{ width: '13px', height: '13px' }} />}
+                            {new Date(post.scheduledAt || post.publishedAt || post.createdAt).toLocaleString()}
                           </div>
                         ) : (
-                          <div>{new Date(post.createdAt).toLocaleDateString()}</div>
+                          <span className="post-management-empty-date">—</span>
                         )}
                       </td>
 
-                      <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                      <td className="post-management-actions-cell">
+                        <div className="post-management-actions">
                           <button
                             onClick={() => setViewingPost(post)}
                             title="View Details"
-                            className="btn-secondary"
+                            aria-label="View post details"
+                            className="btn-secondary post-management-icon-action"
                             style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
                           >
                             <Eye style={{ width: '14px', height: '14px' }} />
@@ -559,23 +723,25 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                                   Review
                                 </button>
                               )}
-                              {post.status !== 'PUBLISHED' && (userRole === 'ADMIN' || userRole === 'CREATOR') &&
+                              {post.status !== 'PUBLISHED' && post.status !== 'SCHEDULED' && (userRole === 'ADMIN' || userRole === 'CREATOR') &&
                                 ((post.targetPlatform || 'LINKEDIN') !== 'INSTAGRAM' || (userRole === 'ADMIN' && post.status === 'APPROVED')) && (
                                 <button
                                   onClick={() => handlePublishPost(post)}
                                   disabled={publishingPostId === post.id}
-                                  title={`Publish to ${post.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}`}
-                                  className="btn-primary"
+                                  title="Publish post"
+                                  className="btn-primary post-management-publish-action"
+                                  aria-label="Publish post"
                                   style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}
                                 >
                                   {publishingPostId === post.id ? <Loader2 className="animate-spin" style={{ width: '14px', height: '14px' }} /> : <Send style={{ width: '14px', height: '14px' }} />}
-                                  Publish to {post.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}
+                                  Publish
                                 </button>
                               )}
                               <button
                                 onClick={() => openEditModal(post)}
                                 title="Edit Post"
-                                className="btn-secondary"
+                                aria-label="Edit post"
+                                className="btn-secondary post-management-icon-action"
                                 style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
                               >
                                 <Edit3 style={{ width: '14px', height: '14px' }} />
@@ -584,7 +750,8 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                               <button
                                 onClick={() => setDeletingPostId(post.id)}
                                 title="Delete Post"
-                                className="btn-secondary"
+                                aria-label="Delete post"
+                                className="btn-secondary post-management-icon-action"
                                 style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#fca5a5', background: 'rgba(127, 29, 29, 0.18)', borderColor: 'rgba(248, 113, 113, 0.3)' }}
                               >
                                 <Trash2 style={{ width: '14px', height: '14px' }} />
@@ -603,9 +770,9 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       )}
 
       {/* CREATE / EDIT POST MODAL */}
-      {(showCreateModal || editingPost) && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div className="glass-panel animate-fade-in" style={{ maxWidth: '680px', width: '100%', padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
+      {typeof document !== 'undefined' && (showCreateModal || editingPost) && createPortal(
+        <div className={isAdminCreate ? 'post-composer-overlay' : undefined} style={{ position: 'fixed', inset: 0, zIndex: 100, overflow: 'hidden', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div className={`glass-panel animate-fade-in${isAdminCreate ? ' admin-post-composer-dialog' : ''}`} style={{ maxWidth: isAdminCreate ? '760px' : '680px', width: '100%', padding: isAdminCreate ? '24px' : '32px', maxHeight: 'calc(100dvh - 48px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <FileText style={{ color: '#B9E769', width: '22px', height: '22px' }} />
@@ -619,35 +786,97 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
             </div>
 
             <p style={{ fontSize: '0.88rem', color: '#C9C19A', marginBottom: '20px' }}>
-              Draft a post, attach media, set its status, and schedule it for the right publishing moment.
+              {isAdminCreate ? 'Create and publish content across your connected social platforms.' : 'Draft a post, attach media, set its status, and schedule it for the right publishing moment.'}
             </p>
 
-            <form onSubmit={(e) => handleSubmitPost(e)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Publishing Destination</label>
-                <select
-                  value={formData.targetPlatform}
-                  onChange={(e) => setFormData({ ...formData, targetPlatform: e.target.value as 'LINKEDIN' | 'INSTAGRAM' })}
-                  className="input-field invite-role-select"
-                  style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
-                >
-                  <option value="LINKEDIN">LinkedIn</option>
-                  <option value="INSTAGRAM">Instagram</option>
-                </select>
-              </div>
+            <form onSubmit={(event) => isAdminCreate ? handleAdminComposerSubmit(event, schedulePost ? 'SCHEDULE' : 'PUBLISH') : handleSubmitPost(event)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {isAdminCreate ? (
+                <>
+                  <section>
+                    <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Publish to</label>
+                    <div className="composer-platform-grid">
+                      {PLATFORM_OPTIONS.map((platform) => {
+                        const selected = selectedComposerPlatforms.includes(platform.id);
+                        const connection = platformConnections[platform.id];
+                        const connectionLabel = connection === 'checking' ? 'Checking' : connection === 'connected' ? 'Connected' : connection === 'unavailable' ? 'Coming soon' : 'Not connected';
+                        const connectionColor = connection === 'connected' ? '#8BD48A' : connection === 'disconnected' ? '#E7A4A4' : '#C9C19A';
+                        return (
+                          <label key={platform.id} className={`composer-platform-option${selected ? ' composer-platform-option-selected' : ''}`}>
+                            {platform.icon}
+                            <span className="composer-platform-copy">
+                              <span className={`composer-platform-name${selected ? ' composer-platform-name-selected' : ''}`}>{platform.name}</span>
+                              <span className="composer-platform-status" style={{ color: connectionColor }}>{connectionLabel}</span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              className="composer-platform-checkbox"
+                              aria-label={`Select ${platform.name}`}
+                              checked={selected}
+                              onChange={() => setSelectedComposerPlatforms((current) => selected ? current.filter((id) => id !== platform.id) : [...current, platform.id])}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {selectedPlatformOptions.filter((platform) => ['disconnected', 'unavailable'].includes(platformConnections[platform.id])).map((platform) => (
+                      <div key={platform.id} role="status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', marginTop: '12px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', color: '#E7E1B1', fontSize: '0.84rem' }}>
+                          <AlertCircle aria-hidden="true" style={{ width: '15px', height: '15px', flex: '0 0 15px', color: '#E7A4A4' }} />
+                          Your {platform.name} account is not connected.{platform.id === 'FACEBOOK' ? ' Facebook connection is not available yet.' : ''}
+                        </span>
+                        <button type="button" onClick={() => { window.location.href = platform.connectUrl || '/dashboard/admin?tab=social'; }} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: 0, border: 'none', background: 'transparent', color: '#B9E769', font: 'inherit', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
+                          <Link2 aria-hidden="true" style={{ width: '14px', height: '14px' }} />
+                          Try to Connect
+                        </button>
+                      </div>
+                    ))}
+                  </section>
 
-              <div>
-                <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Post Copy / Content</label>
-                <textarea
-                  rows={4}
-                  required
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="Write your social post content..."
-                  className="input-field"
-                  style={{ resize: 'vertical', background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
-                />
-              </div>
+                  <div style={{ overflow: 'hidden', border: '1px solid rgba(185, 231, 105, 0.22)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.025)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', borderBottom: '1px solid rgba(185, 231, 105, 0.16)' }}>
+                      <label htmlFor="admin-post-content" style={{ color: '#B9E769', fontSize: '0.86rem', fontWeight: 700 }}>Content</label>
+                      <span style={{ color: '#C9C19A', fontSize: '0.76rem' }}>{formData.content.length} characters</span>
+                    </div>
+                    <textarea
+                      id="admin-post-content"
+                      rows={5}
+                      required
+                      value={formData.content}
+                      onChange={(event) => setFormData((current) => ({ ...current, content: event.target.value }))}
+                      placeholder="What would you like to share?"
+                      style={{ display: 'block', width: '100%', minHeight: '150px', padding: '16px', resize: 'vertical', border: 'none', outline: 'none', background: 'transparent', color: '#FBF5DD', font: 'inherit', fontSize: '0.95rem', lineHeight: 1.6 }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Publishing Destination</label>
+                    <select
+                      value={formData.targetPlatform}
+                      onChange={(event) => setFormData({ ...formData, targetPlatform: event.target.value as 'LINKEDIN' | 'INSTAGRAM' })}
+                      className="input-field invite-role-select"
+                      style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
+                    >
+                      <option value="LINKEDIN">LinkedIn</option>
+                      <option value="INSTAGRAM">Instagram</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Content</label>
+                    <textarea
+                      rows={4}
+                      required
+                      value={formData.content}
+                      onChange={(event) => setFormData({ ...formData, content: event.target.value })}
+                      placeholder="Write your social post content..."
+                      className="input-field"
+                      style={{ resize: 'vertical', background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -716,98 +945,162 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Post Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as PostStatus })}
-                    className="input-field invite-role-select"
-                    style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
-                  >
-                    <option value="DRAFT">DRAFT</option>
-                    {userRole !== 'CREATOR' && <option value="APPROVED">APPROVED</option>}
-                    {userRole !== 'CREATOR' && <option value="SCHEDULED">SCHEDULED</option>}
-                    {userRole !== 'CREATOR' && <option value="QUEUED">QUEUED</option>}
-                    {userRole !== 'CREATOR' && <option value="PROCESSING">PROCESSING</option>}
-                    {userRole !== 'CREATOR' && <option value="PUBLISHED">PUBLISHED</option>}
-                    {userRole !== 'CREATOR' && <option value="FAILED">FAILED</option>}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Scheduled Date & Time (Optional)</label>
-                  <input
-                    type="datetime-local"
-                    value={formData.scheduledAt}
-                    onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                    className="input-field"
-                    style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD', colorScheme: 'dark' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => { setShowCreateModal(false); setEditingPost(null); setAttachedMedia([]); }}
-                  className="btn-secondary"
-                  style={{ background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => handleSubmitPost(e, 'DRAFT')}
-                  disabled={submitting}
-                  className="btn-secondary"
-                  style={{ borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)' }}
-                >
-                  <Save style={{ width: '16px', height: '16px' }} /> Save as Draft
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => handleSubmitPost(e, 'PENDING_REVIEW')}
-                  disabled={submitting || userRole !== 'CREATOR'}
-                  className="btn-primary"
-                  style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}
-                >
-                  <Send style={{ width: '16px', height: '16px' }} /> Submit for Review
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn-primary"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="animate-spin" style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
-                      Saving...
-                    </>
-                  ) : editingPost ? (
-                    'Update Post'
-                  ) : (
-                    'Publish / Schedule Post'
+              {isAdminCreate ? (
+                <div className="composer-schedule-row">
+                  <label className="composer-schedule-toggle">
+                    <input type="checkbox" checked={schedulePost} onChange={(event) => setSchedulePost(event.target.checked)} style={{ width: '17px', height: '17px', accentColor: '#B9E769' }} />
+                    Schedule Post
+                  </label>
+                  {schedulePost && (
+                    <div className="composer-schedule-field">
+                      <label className="input-label composer-schedule-label" style={{ color: '#B9E769', fontWeight: 700 }}>
+                        <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                        Scheduled Date & Time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={formData.scheduledAt}
+                        onChange={(event) => setFormData((current) => ({ ...current, scheduledAt: event.target.value }))}
+                        className="input-field composer-schedule-datetime"
+                        style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD', colorScheme: 'dark' }}
+                      />
+                    </div>
                   )}
-                </button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Post Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(event) => setFormData({ ...formData, status: event.target.value as PostStatus })}
+                      className="input-field invite-role-select"
+                      style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD' }}
+                    >
+                      <option value="DRAFT">DRAFT</option>
+                      {userRole !== 'CREATOR' && <option value="APPROVED">APPROVED</option>}
+                      {userRole !== 'CREATOR' && <option value="SCHEDULED">SCHEDULED</option>}
+                      {userRole !== 'CREATOR' && <option value="QUEUED">QUEUED</option>}
+                      {userRole !== 'CREATOR' && <option value="PROCESSING">PROCESSING</option>}
+                      {userRole !== 'CREATOR' && <option value="PUBLISHED">PUBLISHED</option>}
+                      {userRole !== 'CREATOR' && <option value="FAILED">FAILED</option>}
+                    </select>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => handleSubmitPost(e, editingPost ? formData.status : 'DRAFT', true)}
-                  disabled={submitting}
-                  className="btn-primary"
-                >
-                  {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
-                  Publish to {formData.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}
-                </button>
-              </div>
+                  <div>
+                    <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Scheduled Date & Time (Optional)</label>
+                    <input
+                      type="datetime-local"
+                      value={formData.scheduledAt}
+                      onChange={(event) => setFormData({ ...formData, scheduledAt: event.target.value })}
+                      className="input-field"
+                      style={{ background: 'rgba(255, 255, 255, 0.035)', borderColor: 'rgba(231, 225, 177, 0.3)', color: '#FBF5DD', colorScheme: 'dark' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isAdminCreate && errorMsg && (
+                <div role="alert" style={{ padding: '10px 12px', borderRadius: '8px', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.24)', fontSize: '0.84rem' }}>
+                  {errorMsg}
+                </div>
+              )}
+
+              {isAdminCreate ? (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => { setShowCreateModal(false); setAttachedMedia([]); setErrorMsg(null); }} className="btn-secondary" style={{ color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)' }}>
+                    Cancel
+                  </button>
+                  <button type="button" onClick={(event) => handleAdminComposerSubmit(event, 'DRAFT')} disabled={submitting} className="btn-secondary" style={{ color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)' }}>
+                    <Save style={{ width: '16px', height: '16px' }} /> Save as Draft
+                  </button>
+                  <button type="submit" disabled={submitting} className="btn-primary" style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
+                    {submitting && schedulePost ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : schedulePost ? <Clock style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
+                    {schedulePost ? 'Schedule' : 'Publish'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCreateModal(false); setEditingPost(null); setAttachedMedia([]); }}
+                    className="btn-secondary"
+                    style={{ background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(event) => handleSubmitPost(event, 'DRAFT')}
+                    disabled={submitting}
+                    className="btn-secondary"
+                    style={{ borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)' }}
+                  >
+                    <Save style={{ width: '16px', height: '16px' }} /> Save as Draft
+                  </button>
+
+                  {userRole === 'CREATOR' && (
+                    <button
+                      type="button"
+                      onClick={(event) => handleSubmitPost(event, 'PENDING_REVIEW')}
+                      disabled={submitting}
+                      className="btn-primary"
+                      style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}
+                    >
+                      <Send style={{ width: '16px', height: '16px' }} /> Submit for Review
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="btn-primary"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="animate-spin" style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                        Saving...
+                      </>
+                    ) : editingPost ? (
+                      'Update Post'
+                    ) : (
+                      'Publish / Schedule Post'
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(event) => handleSubmitPost(event, editingPost ? formData.status : 'DRAFT', true)}
+                    disabled={submitting}
+                    className="btn-primary"
+                  >
+                    {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
+                    Publish to {formData.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}
+                  </button>
+                </div>
+              )}
             </form>
           </div>
+          {isAdminCreate && directPublishStatus && (
+            <div className="direct-publish-status-overlay" role="status" aria-live="polite">
+              <div className={`direct-publish-status-content${directPublishStatus === 'success' ? ' direct-publish-status-success' : ''}`}>
+                <div className="direct-publish-status-icon">
+                  {directPublishStatus === 'publishing' ? (
+                    <Loader2 aria-hidden="true" className="direct-publish-spinner" />
+                  ) : (
+                    <CheckCircle2 aria-hidden="true" className="direct-publish-check" />
+                  )}
+                </div>
+                <p className="direct-publish-status-message">
+                  {directPublishStatus === 'publishing' ? 'Publishing your post...' : 'Your post uploaded successfully'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      , document.body)}
 
       {reviewingPost && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -828,7 +1121,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       )}
 
       {/* MEDIA SELECTOR MODAL */}
-      {showMediaSelectorModal && (
+      {typeof document !== 'undefined' && showMediaSelectorModal && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div className="glass-panel animate-fade-in" style={{ maxWidth: '900px', width: '100%', padding: '28px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -860,7 +1153,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* VIEW POST DETAILS MODAL */}
       {viewingPost && (

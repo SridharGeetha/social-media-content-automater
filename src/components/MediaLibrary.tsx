@@ -270,49 +270,6 @@ export default function MediaLibrary({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
-      {/* Header Banner */}
-      {!selectable && (
-        <div
-          className="glass-panel"
-          style={{
-            padding: '24px',
-            borderRadius: '18px',
-            background: 'linear-gradient(135deg, rgba(10, 30, 14, 0.9) 0%, rgba(16, 45, 22, 0.92) 100%)',
-            border: '1px solid rgba(185, 231, 105, 0.2)',
-            boxShadow: '0 14px 35px rgba(17, 40, 21, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px',
-          }}
-        >
-          <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#F9F2DA', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Film style={{ color: '#A5D86A', width: '24px', height: '24px' }} />
-              Workspace Media Library
-            </h2>
-            <p style={{ color: '#C9C19A', fontSize: '0.9rem', marginTop: '4px' }}>
-              Securely store and manage Cloudinary media assets isolated for your workspace.
-            </p>
-          </div>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="btn-primary"
-            disabled={uploading}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', fontWeight: 700 }}
-          >
-            {uploading ? (
-              <Loader2 className="animate-spin" style={{ width: '18px', height: '18px' }} />
-            ) : (
-              <Upload style={{ width: '18px', height: '18px' }} />
-            )}
-            Upload Media
-          </button>
-        </div>
-      )}
-
       {/* Notifications */}
       {errorMsg && (
         <div
@@ -383,15 +340,15 @@ export default function MediaLibrary({
         onClick={() => !uploading && fileInputRef.current?.click()}
         style={{
           border: isDragOver
-            ? '2px dashed #A5D86A'
-            : '2px dashed rgba(185, 231, 105, 0.22)',
-          borderRadius: '16px',
+            ? '2px dashed #B9E769'
+            : '2px dashed rgba(231, 225, 177, 0.22)',
+          borderRadius: '8px',
           padding: '28px',
           textAlign: 'center',
-          background: isDragOver ? 'rgba(56, 128, 53, 0.12)' : 'rgba(8, 17, 12, 0.7)',
+          background: isDragOver ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.025)',
           cursor: uploading ? 'not-allowed' : 'pointer',
           transition: 'all 0.2s ease-in-out',
-          boxShadow: 'inset 0 0 0 1px rgba(185, 231, 105, 0.08)',
+          boxShadow: 'inset 0 0 0 1px rgba(231, 225, 177, 0.05)',
         }}
       >
         {uploading ? (
@@ -424,7 +381,7 @@ export default function MediaLibrary({
 
       {/* Filter Tabs & Media Grid */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(11, 28, 16, 0.75)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(185, 231, 105, 0.16)' }}>
+        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255, 255, 255, 0.025)', padding: '4px', borderRadius: '8px', border: '1px solid rgba(231, 225, 177, 0.14)' }}>
           <button
             onClick={() => setFilterType('all')}
             style={{
@@ -434,8 +391,8 @@ export default function MediaLibrary({
               fontSize: '0.85rem',
               fontWeight: 600,
               cursor: 'pointer',
-              background: filterType === 'all' ? '#A5D86A' : 'transparent',
-              color: filterType === 'all' ? '#10210d' : '#C9C19A',
+              background: filterType === 'all' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: filterType === 'all' ? '#B9E769' : '#C9C19A',
             }}
           >
             All Media
@@ -452,8 +409,8 @@ export default function MediaLibrary({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: filterType === 'image' ? '#A5D86A' : 'transparent',
-              color: filterType === 'image' ? '#10210d' : '#C9C19A',
+              background: filterType === 'image' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: filterType === 'image' ? '#B9E769' : '#C9C19A',
             }}
           >
             <ImageIcon style={{ width: '14px', height: '14px' }} />
@@ -471,8 +428,8 @@ export default function MediaLibrary({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: filterType === 'video' ? '#A5D86A' : 'transparent',
-              color: filterType === 'video' ? '#10210d' : '#C9C19A',
+              background: filterType === 'video' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              color: filterType === 'video' ? '#B9E769' : '#C9C19A',
             }}
           >
             <Film style={{ width: '14px', height: '14px' }} />
@@ -515,13 +472,13 @@ export default function MediaLibrary({
                 onClick={() => selectable && toggleSelectMedia(item)}
                 style={{
                   position: 'relative',
-                  borderRadius: '14px',
+                  borderRadius: '8px',
                   overflow: 'hidden',
-                  background: 'linear-gradient(180deg, rgba(8, 17, 12, 0.84) 0%, rgba(15, 29, 18, 0.9) 100%)',
+                  background: 'rgba(255, 255, 255, 0.025)',
                   border: isSelected
                     ? '2px solid #A5D86A'
-                    : '1px solid rgba(185, 231, 105, 0.14)',
-                  boxShadow: isSelected ? '0 0 18px rgba(165, 216, 106, 0.18)' : '0 10px 24px rgba(9, 15, 11, 0.24)',
+                    : '1px solid rgba(231, 225, 177, 0.14)',
+                  boxShadow: isSelected ? '0 0 0 1px rgba(185, 231, 105, 0.18)' : '0 10px 24px rgba(0, 0, 0, 0.18)',
                   cursor: selectable ? 'pointer' : 'default',
                   transition: 'all 0.2s ease',
                   display: 'flex',
