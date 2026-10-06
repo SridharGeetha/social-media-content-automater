@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -51,7 +52,7 @@ describe('Post review publishing', () => {
     mocks.postFindOne.mockResolvedValue(post);
 
     const response = await POST(
-      new Request('http://localhost:3000/api/posts/post-a/review', {
+      new NextRequest('http://localhost:3000/api/posts/post-a/review', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'APPROVE', scheduledAt: new Date(scheduledAt.getTime() + 60_000).toISOString() }),
@@ -71,7 +72,7 @@ describe('Post review publishing', () => {
     mocks.postFindOne.mockResolvedValue(post);
 
     const response = await POST(
-      new Request('http://localhost:3000/api/posts/post-a/review', {
+      new NextRequest('http://localhost:3000/api/posts/post-a/review', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'APPROVE' }),
@@ -92,7 +93,7 @@ describe('Post review publishing', () => {
     mocks.postFindOne.mockResolvedValue(post);
 
     const response = await POST(
-      new Request('http://localhost:3000/api/posts/post-a/review', {
+      new NextRequest('http://localhost:3000/api/posts/post-a/review', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'APPROVE', scheduledAt: scheduledAt.toISOString() }),
