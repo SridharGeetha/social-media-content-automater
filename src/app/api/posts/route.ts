@@ -5,7 +5,8 @@ import Post, { PostStatus, PostTargetPlatform } from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
 import User from '@/models/User';
 import Media from '@/models/Media';
-import { schedulePost } from '@/lib/qstash';
+import SocialAccount from '@/models/SocialAccount';
+import { publishPostImmediately, schedulePost } from '@/lib/qstash';
 
 const VALID_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-  const { content, mediaIds, platform, targetPlatform, status, scheduledAt } = body;
+  const { content, mediaIds, platform, targetPlatform, status, scheduledAt, publishImmediately } = body;
 
     if (!content || typeof content !== 'string' || !content.trim()) {
       return NextResponse.json({ error: 'Post content is required.' }, { status: 400 });
@@ -142,6 +143,12 @@ export async function POST(req: NextRequest) {
     const selectedTargetPlatform = targetPlatform === undefined ? 'LINKEDIN' : targetPlatform;
     if (selectedTargetPlatform !== 'LINKEDIN' && selectedTargetPlatform !== 'INSTAGRAM') {
       return NextResponse.json({ error: 'Invalid target platform.' }, { status: 400 });
+    }
+    if (currentMember.role === 'CREATOR') {
+      const account = await SocialAccount.findOne({ workspaceId: currentMember.workspaceId, platform: selectedTargetPlatform }).select('status');
+      if (account?.status !== 'CONNECTED') {
+        return NextResponse.json({ error: 'Creators can submit posts only to connected social platforms.' }, { status: 403 });
+      }
     }
 
     // Workspace Isolation Check for Attached Media:
@@ -167,6 +174,9 @@ export async function POST(req: NextRequest) {
     }
     if (currentMember.role === 'CREATOR' && requestedStatus && !['DRAFT', 'PENDING_REVIEW'].includes(requestedStatus)) {
       return NextResponse.json({ error: 'Creators can only save drafts or submit posts for review.' }, { status: 403 });
+    }
+    if (publishImmediately && (currentMember.role !== 'MANAGER' || requestedStatus !== 'APPROVED')) {
+      return NextResponse.json({ error: 'Only Managers can queue approved posts for immediate publishing.' }, { status: 403 });
     }
 
     const postStatus: PostStatus = requestedStatus
@@ -215,6 +225,19 @@ export async function POST(req: NextRequest) {
         };
         await newPost.save();
         return NextResponse.json({ error: `Post was created but could not be scheduled: ${reason}`, details: reason }, { status: 502 });
+      }
+    } else if (publishImmediately) {
+      try {
+        await publishPostImmediately(newPost._id.toString(), newPost.targetPlatform);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Failed to queue post for immediate publishing.';
+        newPost.status = 'FAILED';
+        newPost.publishing = {
+          platform: newPost.targetPlatform,
+          error: reason,
+        };
+        await newPost.save();
+        return NextResponse.json({ error: `Post was created but could not be queued for publishing: ${reason}`, details: reason }, { status: 502 });
       }
     }
 

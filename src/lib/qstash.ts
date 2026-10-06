@@ -46,9 +46,9 @@ export async function scheduleLinkedInPost(postId: string, scheduledAt: Date): P
 
   const result = await getQStashClient().publishJSON({
     url: getProductionPublishUrl(),
-    body: { postId },
+    body: { postId, scheduledAt: scheduledAt.toISOString() },
     notBefore: Math.floor(scheduledUnixTime / 1000),
-    deduplicationId: `linkedin-post-${postId}`,
+    deduplicationId: `linkedin-post-${postId}-${scheduledUnixTime}`,
   });
 
   if (!result.messageId) {
@@ -115,4 +115,19 @@ export async function scheduleInstagramContainerRetry(
 export async function schedulePost(postId: string, scheduledAt: Date, targetPlatform?: string): Promise<string> {
   if (targetPlatform === 'INSTAGRAM') return scheduleInstagramPost(postId, scheduledAt);
   return scheduleLinkedInPost(postId, scheduledAt);
+}
+
+export async function publishPostImmediately(postId: string, targetPlatform?: string): Promise<string> {
+  const isInstagram = targetPlatform === 'INSTAGRAM';
+  const result = await getQStashClient().publishJSON({
+    url: isInstagram ? getProductionInstagramPublishUrl() : getProductionPublishUrl(),
+    body: { postId },
+    deduplicationId: `${isInstagram ? 'instagram' : 'linkedin'}-approved-post-${postId}`,
+  });
+
+  if (!result.messageId) {
+    throw new Error('QStash did not return a message ID for the approved post.');
+  }
+
+  return result.messageId;
 }

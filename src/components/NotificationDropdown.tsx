@@ -71,6 +71,7 @@ export default function NotificationDropdown({
 
   // Read IDs localStorage key
   const storageKey = `sm_read_notifs_${effectiveUserId}`;
+  const dismissedStorageKey = `sm_dismissed_notifs_${effectiveUserId}`;
 
   // Load read notification IDs from localStorage on client mount
   useEffect(() => {
@@ -99,9 +100,19 @@ export default function NotificationDropdown({
       const res = await fetch('/api/notifications');
       if (res.ok) {
         const data = await res.json();
-        setPosts(data.postNotifications || []);
+        let dismissedIds = new Set<string>();
+        try {
+          const stored = localStorage.getItem(dismissedStorageKey);
+          const parsed: unknown = stored ? JSON.parse(stored) : [];
+          if (Array.isArray(parsed)) {
+            dismissedIds = new Set(parsed.filter((id): id is string => typeof id === 'string'));
+          }
+        } catch {
+          // Ignore malformed or unavailable local storage.
+        }
+        setPosts((data.postNotifications || []).filter((post: PostNotificationItem) => !dismissedIds.has(post.id)));
         if (canViewInvitations) {
-          setInvitations(data.invitationNotifications || []);
+          setInvitations((data.invitationNotifications || []).filter((invitation: InvitationNotificationItem) => !dismissedIds.has(invitation.id)));
         } else {
           setInvitations([]);
         }
@@ -111,7 +122,7 @@ export default function NotificationDropdown({
     } finally {
       setLoading(false);
     }
-  }, [canViewInvitations]);
+  }, [canViewInvitations, dismissedStorageKey]);
 
   useEffect(() => {
     fetchNotifications();
@@ -203,6 +214,22 @@ export default function NotificationDropdown({
       onNavigateToTab('members');
     }
     setIsOpen(false);
+  };
+
+  const dismissNotification = (id: string) => {
+    try {
+      const stored = localStorage.getItem(dismissedStorageKey);
+      const parsed: unknown = stored ? JSON.parse(stored) : [];
+      const dismissedIds = Array.isArray(parsed)
+        ? parsed.filter((storedId): storedId is string => typeof storedId === 'string')
+        : [];
+      if (!dismissedIds.includes(id)) dismissedIds.push(id);
+      localStorage.setItem(dismissedStorageKey, JSON.stringify(dismissedIds));
+    } catch {
+      // Keep the item dismissed for the current session if storage is unavailable.
+    }
+    setPosts((current) => current.filter((post) => post.id !== id));
+    setInvitations((current) => current.filter((invitation) => invitation.id !== id));
   };
 
   return (
@@ -346,75 +373,83 @@ export default function NotificationDropdown({
                   posts.map((post) => {
                     const isUnread = !readIds.includes(post.id);
                     return (
-                      <div
+                      <article
                         key={post.id}
                         className={`notification-card ${isUnread ? 'unread' : ''}`}
-                        onClick={() => handlePostClick(post)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') handlePostClick(post);
-                        }}
                       >
-                        {/* Icon by category */}
-                        <div
-                          className={`notification-card-icon ${
-                            post.category === 'PUBLISHED'
-                              ? 'notification-icon-published'
-                              : post.category === 'FAILED'
-                              ? 'notification-icon-failed'
-                              : 'notification-icon-scheduled'
-                          }`}
+                        <button
+                          type="button"
+                          className="notification-card-content"
+                          onClick={() => handlePostClick(post)}
+                          aria-label={`Open notification: ${post.title}`}
                         >
-                          {post.category === 'PUBLISHED' && (
-                            <CheckCircle2 style={{ width: '18px', height: '18px' }} />
-                          )}
-                          {post.category === 'FAILED' && (
-                            <AlertTriangle style={{ width: '18px', height: '18px' }} />
-                          )}
-                          {post.category === 'SCHEDULED' && (
-                            <Clock style={{ width: '18px', height: '18px' }} />
-                          )}
-                        </div>
-
-                        {/* Card Body */}
-                        <div className="notification-card-body">
-                          <div className="notification-card-top">
-                            <span className="notification-card-title">{post.title}</span>
-                            <span className="notification-time">
-                              {formatRelativeTime(post.timestamp)}
-                            </span>
-                          </div>
-
-                          {post.snippet && (
-                            <p className="notification-snippet">{post.snippet}</p>
-                          )}
-
-                          <div className="notification-detail">
-                            <span>{post.detail}</span>
-                          </div>
-
-                          <div className="notification-meta-row">
-                            <span
-                              className={`notification-badge-tag ${
-                                post.category === 'PUBLISHED'
-                                  ? 'badge-tag-published'
-                                  : post.category === 'FAILED'
-                                  ? 'badge-tag-failed'
-                                  : 'badge-tag-scheduled'
-                              }`}
-                            >
-                              {post.status}
-                            </span>
-
-                            {effectiveRole !== 'CREATOR' && post.authorName && (
-                              <span className="notification-author">
-                                by {post.authorName}
-                              </span>
+                          <div
+                            className={`notification-card-icon ${
+                              post.category === 'PUBLISHED'
+                                ? 'notification-icon-published'
+                                : post.category === 'FAILED'
+                                ? 'notification-icon-failed'
+                                : 'notification-icon-scheduled'
+                            }`}
+                          >
+                            {post.category === 'PUBLISHED' && (
+                              <CheckCircle2 style={{ width: '18px', height: '18px' }} />
+                            )}
+                            {post.category === 'FAILED' && (
+                              <AlertTriangle style={{ width: '18px', height: '18px' }} />
+                            )}
+                            {post.category === 'SCHEDULED' && (
+                              <Clock style={{ width: '18px', height: '18px' }} />
                             )}
                           </div>
-                        </div>
-                      </div>
+
+                          <div className="notification-card-body">
+                            <div className="notification-card-top">
+                              <span className="notification-card-title">{post.title}</span>
+                              <span className="notification-time">
+                                {formatRelativeTime(post.timestamp)}
+                              </span>
+                            </div>
+
+                            {post.snippet && (
+                              <p className="notification-snippet">{post.snippet}</p>
+                            )}
+
+                            <div className="notification-detail">
+                              <span>{post.detail}</span>
+                            </div>
+
+                            <div className="notification-meta-row">
+                              <span
+                                className={`notification-badge-tag ${
+                                  post.category === 'PUBLISHED'
+                                    ? 'badge-tag-published'
+                                    : post.category === 'FAILED'
+                                    ? 'badge-tag-failed'
+                                    : 'badge-tag-scheduled'
+                                }`}
+                              >
+                                {post.status}
+                              </span>
+
+                              {effectiveRole !== 'CREATOR' && post.authorName && (
+                                <span className="notification-author">
+                                  by {post.authorName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          className="notification-dismiss-btn"
+                          onClick={() => dismissNotification(post.id)}
+                          title="Dismiss notification"
+                          aria-label={`Dismiss notification: ${post.title}`}
+                        >
+                          <X style={{ width: '15px', height: '15px' }} />
+                        </button>
+                      </article>
                     );
                   })
                 )}
@@ -438,69 +473,79 @@ export default function NotificationDropdown({
                   invitations.map((inv) => {
                     const isUnread = !readIds.includes(inv.id);
                     return (
-                      <div
+                      <article
                         key={inv.id}
                         className={`notification-card ${isUnread ? 'unread' : ''}`}
-                        onClick={() => handleInvitationClick(inv)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') handleInvitationClick(inv);
-                        }}
                       >
-                        <div
-                          className={`notification-card-icon ${
-                            inv.category === 'INVITATION_ACCEPTED'
-                              ? 'notification-icon-invitation-accepted'
-                              : inv.category === 'INVITATION_EXPIRED'
-                              ? 'notification-icon-invitation-expired'
-                              : 'notification-icon-invitation-pending'
-                          }`}
+                        <button
+                          type="button"
+                          className="notification-card-content"
+                          onClick={() => handleInvitationClick(inv)}
+                          aria-label={`Open notification: ${inv.title}`}
                         >
-                          {inv.category === 'INVITATION_ACCEPTED' && (
-                            <UserCheck style={{ width: '18px', height: '18px' }} />
-                          )}
-                          {inv.category === 'INVITATION_EXPIRED' && (
-                            <AlertTriangle style={{ width: '18px', height: '18px' }} />
-                          )}
-                          {inv.category === 'INVITATION_SENT' && (
-                            <Send style={{ width: '16px', height: '16px' }} />
-                          )}
-                        </div>
-
-                        <div className="notification-card-body">
-                          <div className="notification-card-top">
-                            <span className="notification-card-title">{inv.title}</span>
-                            <span className="notification-time">
-                              {formatRelativeTime(inv.timestamp)}
-                            </span>
+                          <div
+                            className={`notification-card-icon ${
+                              inv.category === 'INVITATION_ACCEPTED'
+                                ? 'notification-icon-invitation-accepted'
+                                : inv.category === 'INVITATION_EXPIRED'
+                                ? 'notification-icon-invitation-expired'
+                                : 'notification-icon-invitation-pending'
+                            }`}
+                          >
+                            {inv.category === 'INVITATION_ACCEPTED' && (
+                              <UserCheck style={{ width: '18px', height: '18px' }} />
+                            )}
+                            {inv.category === 'INVITATION_EXPIRED' && (
+                              <AlertTriangle style={{ width: '18px', height: '18px' }} />
+                            )}
+                            {inv.category === 'INVITATION_SENT' && (
+                              <Send style={{ width: '16px', height: '16px' }} />
+                            )}
                           </div>
 
-                          <p className="notification-snippet">{inv.message}</p>
+                          <div className="notification-card-body">
+                            <div className="notification-card-top">
+                              <span className="notification-card-title">{inv.title}</span>
+                              <span className="notification-time">
+                                {formatRelativeTime(inv.timestamp)}
+                              </span>
+                            </div>
 
-                          <div className="notification-detail">
-                            <span>{inv.detail}</span>
+                            <p className="notification-snippet">{inv.message}</p>
+
+                            <div className="notification-detail">
+                              <span>{inv.detail}</span>
+                            </div>
+
+                            <div className="notification-meta-row">
+                              <span
+                                className={`notification-badge-tag ${
+                                  inv.status === 'ACCEPTED'
+                                    ? 'badge-tag-accepted'
+                                    : inv.status === 'EXPIRED'
+                                    ? 'badge-tag-expired'
+                                    : 'badge-tag-pending'
+                                }`}
+                              >
+                                {inv.status}
+                              </span>
+
+                              <span className="notification-author">
+                                Role: {inv.role}
+                              </span>
+                            </div>
                           </div>
-
-                          <div className="notification-meta-row">
-                            <span
-                              className={`notification-badge-tag ${
-                                inv.status === 'ACCEPTED'
-                                  ? 'badge-tag-accepted'
-                                  : inv.status === 'EXPIRED'
-                                  ? 'badge-tag-expired'
-                                  : 'badge-tag-pending'
-                              }`}
-                            >
-                              {inv.status}
-                            </span>
-
-                            <span className="notification-author">
-                              Role: {inv.role}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                        </button>
+                        <button
+                          type="button"
+                          className="notification-dismiss-btn"
+                          onClick={() => dismissNotification(inv.id)}
+                          title="Dismiss notification"
+                          aria-label={`Dismiss notification: ${inv.title}`}
+                        >
+                          <X style={{ width: '15px', height: '15px' }} />
+                        </button>
+                      </article>
                     );
                   })
                 )}

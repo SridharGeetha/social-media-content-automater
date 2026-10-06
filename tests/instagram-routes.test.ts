@@ -121,4 +121,15 @@ describe('Instagram social routes', () => {
     expect(disconnectResponse.status).toBe(200);
     expect(mocks.socialDeleteOne).toHaveBeenCalledWith({ workspaceId: workspace, platform: 'INSTAGRAM' });
   });
+
+  it('lets Creators read connection status without exposing account details', async () => {
+    mocks.memberFindOne.mockReturnValue({ sort: vi.fn().mockResolvedValue({ workspaceId: workspace, role: 'CREATOR' }) });
+    mocks.socialFindOne.mockReturnValue({ select: vi.fn().mockResolvedValue({ status: 'CONNECTED' }) });
+
+    const response = await getAccount();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ connected: true });
+  });
 });

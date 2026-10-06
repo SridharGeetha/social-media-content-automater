@@ -3,24 +3,30 @@
 import React, { useEffect, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import {
-  CheckCircle2,
-  Calendar,
-  TrendingUp,
   LogOut,
   FileText,
-  Clock,
   Layers,
   Film,
   UserCircle,
+  Plus,
+  Save,
 } from 'lucide-react';
-import PostsManager from '@/components/PostsManager';
+import PostsManager, { PostStatus } from '@/components/PostsManager';
 import MediaLibrary from '@/components/MediaLibrary';
 import NotificationDropdown from '@/components/NotificationDropdown';
 
 export default function ManagerDashboard() {
   const { data: session } = useSession();
   const [workspaceName, setWorkspaceName] = useState('Workspace');
-  const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'queue' | 'calendar' | 'activity'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'queue'>('posts');
+  const [createPostTrigger, setCreatePostTrigger] = useState(0);
+  const [createPostStatus, setCreatePostStatus] = useState<PostStatus>('DRAFT');
+
+  const openPostComposer = (status: PostStatus) => {
+    setCreatePostStatus(status);
+    setCreatePostTrigger((value) => value + 1);
+    setActiveTab('posts');
+  };
 
   useEffect(() => {
     fetch('/api/members')
@@ -110,47 +116,6 @@ export default function ManagerDashboard() {
             </div>
           </button>
 
-          <button
-            onClick={() => setActiveTab('calendar')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 14px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'calendar' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-              color: activeTab === 'calendar' ? '#ffffff' : '#e6f8e2',
-              fontWeight: activeTab === 'calendar' ? 700 : 500,
-              fontSize: '0.92rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <Calendar style={{ width: '18px', height: '18px' }} />
-            Campaign Schedule
-          </button>
-
-          <button
-            onClick={() => setActiveTab('activity')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 14px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'activity' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-              color: activeTab === 'activity' ? '#ffffff' : '#e6f8e2',
-              fontWeight: activeTab === 'activity' ? 700 : 500,
-              fontSize: '0.92rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <TrendingUp style={{ width: '18px', height: '18px' }} />
-            Team Performance
-          </button>
         </nav>
 
         <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
@@ -174,25 +139,33 @@ export default function ManagerDashboard() {
       <main className="dashboard-main-content" style={{ flex: 1, padding: '36px', overflowY: 'auto' }}>
         <div className="dashboard-top-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0D530E' }}>Manager Strategy & Approvals</h1>
-            <p style={{ color: '#306D29', fontSize: '0.92rem', marginTop: '4px' }}>
-              Review creator submissions, organize social campaigns, and manage publishing timelines.
-            </p>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 400, color: '#B9E769' }}>
+              {activeTab === 'posts' ? 'All Workspace Posts' : activeTab === 'media' ? 'Media Library' : 'Content Review Queue'}
+            </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button type="button" onClick={() => openPostComposer('DRAFT')} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)', color: '#E7E1B1' }}>
+              <Save style={{ width: '14px', height: '14px' }} />
+              Save Draft
+            </button>
+            <button type="button" onClick={() => openPostComposer('SCHEDULED')} className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.85rem' }}>
+              <Plus style={{ width: '16px', height: '16px' }} />
+              Create Post
+            </button>
             <NotificationDropdown
               userRole="MANAGER"
               currentUserId={session?.user?.id}
-              onNavigateToTab={(tab) => setActiveTab(tab as any)}
+              onNavigateToTab={(tab) => {
+                if (tab === 'posts' || tab === 'media' || tab === 'queue') setActiveTab(tab);
+              }}
             />
-            <span className="role-badge role-manager" style={{ background: 'rgba(48, 109, 41, 0.12)', color: '#0D530E', borderColor: 'rgba(48, 109, 41, 0.3)' }}>Active Role: MANAGER</span>
           </div>
         </div>
 
         {/* Live Posts Management Tab */}
         {activeTab === 'posts' && (
           <div className="animate-fade-in">
-            <PostsManager userRole="MANAGER" />
+            <PostsManager key={createPostTrigger} userRole="MANAGER" createPostTrigger={createPostTrigger} createPostStatus={createPostStatus} openCreateOnMount={createPostTrigger > 0} hideManagementHeader />
           </div>
         )}
 
@@ -206,17 +179,7 @@ export default function ManagerDashboard() {
         {/* Content Review Queue */}
         {activeTab === 'queue' && (
           <div className="animate-fade-in">
-            <PostsManager userRole="MANAGER" initialStatus="PENDING_REVIEW" />
-          </div>
-        )}
-
-        {(activeTab === 'calendar' || activeTab === 'activity') && (
-          <div className="glass-panel animate-fade-in" style={{ padding: '36px', textAlign: 'center' }}>
-            <Clock style={{ width: '32px', height: '32px', color: '#22d3ee', margin: '0 auto 12px auto' }} />
-            <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', marginBottom: '6px' }}>Section Ready for Phase 2</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-              Advanced campaign scheduling and team performance metrics will be available in future releases.
-            </p>
+            <PostsManager userRole="MANAGER" initialStatus="PENDING_REVIEW" hideManagementHeader />
           </div>
         )}
       </main>

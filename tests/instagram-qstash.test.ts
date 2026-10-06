@@ -8,7 +8,7 @@ vi.mock('@upstash/qstash', () => ({
   }),
 }));
 
-import { scheduleInstagramContainerRetry, scheduleInstagramPost, schedulePost } from '@/lib/qstash';
+import { publishPostImmediately, scheduleInstagramContainerRetry, scheduleInstagramPost, schedulePost } from '@/lib/qstash';
 
 describe('Instagram QStash scheduling', () => {
   beforeEach(() => {
@@ -37,9 +37,19 @@ describe('Instagram QStash scheduling', () => {
 
     expect(mocks.publishJSON).toHaveBeenCalledWith(expect.objectContaining({
       url: 'https://app.example.com/api/publish',
-      body: { postId: 'legacy-post-a' },
-      deduplicationId: 'linkedin-post-legacy-post-a',
+      body: { postId: 'legacy-post-a', scheduledAt: scheduledAt.toISOString() },
+      deduplicationId: `linkedin-post-legacy-post-a-${scheduledAt.getTime()}`,
     }));
+  });
+
+  it('queues approved posts immediately on the platform-specific publish endpoint', async () => {
+    await expect(publishPostImmediately('post-a', 'INSTAGRAM')).resolves.toBe('qstash-message-a');
+
+    expect(mocks.publishJSON).toHaveBeenCalledWith({
+      url: 'https://app.example.com/api/publish/instagram',
+      body: { postId: 'post-a' },
+      deduplicationId: 'instagram-approved-post-post-a',
+    });
   });
 
   it('queues a follow-up check for the existing Instagram container', async () => {

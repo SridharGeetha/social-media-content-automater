@@ -192,6 +192,29 @@ describe('Instagram publishing routes', () => {
     expect(mocks.publishInstagramContainerForPost).toHaveBeenCalledTimes(1);
   });
 
+  it('publishes an approved unscheduled Instagram post from the immediate queue', async () => {
+    const post = makePost('APPROVED');
+    scheduledPost = post;
+    mocks.postFindOne.mockResolvedValue(post);
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({ postId: 'post-a' }),
+    });
+
+    const response = await publishScheduled(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.postId).toBe('instagram-media-a');
+    expect(mocks.postFindOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'APPROVED', targetPlatform: 'INSTAGRAM' }),
+      expect.objectContaining({ $set: expect.objectContaining({ status: 'PROCESSING' }) }),
+      { new: true }
+    );
+    expect(post.status).toBe('PUBLISHED');
+  });
+
   it('ignores an old QStash delivery after the schedule was changed', async () => {
     const post = makePost('SCHEDULED');
     post.scheduledAt = new Date('2026-10-01T12:00:00.000Z');
@@ -207,6 +230,31 @@ describe('Instagram publishing routes', () => {
 
     expect(response.status).toBe(200);
     expect(body.message).toContain('outdated');
+    expect(mocks.postFindOneAndUpdate).not.toHaveBeenCalled();
+    expect(mocks.publishPostToInstagram).not.toHaveBeenCalled();
+  });
+
+  it('ignores an old container retry after an edit invalidates that container', async () => {
+    const post = makePost('SCHEDULED');
+    post.scheduledAt = new Date(Date.now() + 60_000);
+    post.publishing = { platform: 'INSTAGRAM', containerId: 'new-container' };
+    mocks.postFindOne.mockResolvedValue(post);
+
+    const request = new NextRequest('http://localhost:3000/api/publish/instagram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'upstash-signature': 'valid' },
+      body: JSON.stringify({
+        postId: 'post-a',
+        scheduledAt: post.scheduledAt.toISOString(),
+        containerId: 'old-container',
+        retryAttempt: 1,
+      }),
+    });
+    const response = await publishScheduled(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.message).toContain('outdated Instagram container');
     expect(mocks.postFindOneAndUpdate).not.toHaveBeenCalled();
     expect(mocks.publishPostToInstagram).not.toHaveBeenCalled();
   });

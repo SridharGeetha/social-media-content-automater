@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   Plus,
   FileText,
+  Check,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -114,12 +115,18 @@ const INITIAL_PLATFORM_CONNECTIONS = PLATFORM_OPTIONS.reduce<Record<ComposerPlat
   return connections;
 }, {});
 
+function toLocalDateTimeInput(date: Date): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 interface PostsManagerProps {
   userRole?: 'ADMIN' | 'MANAGER' | 'CREATOR';
   currentUserId?: string;
   initialStatus?: string;
   createPostTrigger?: number;
   createPostStatus?: PostStatus;
+  openCreateOnMount?: boolean;
+  hideManagementHeader?: boolean;
 }
 
 const STATUS_TABS: { label: string; value: string }[] = [
@@ -135,7 +142,7 @@ const STATUS_TABS: { label: string; value: string }[] = [
   { label: 'Failed', value: 'FAILED' },
 ];
 
-export default function PostsManager({ userRole, currentUserId, initialStatus = 'ALL', createPostTrigger, createPostStatus }: PostsManagerProps) {
+export default function PostsManager({ userRole, currentUserId, initialStatus = 'ALL', createPostTrigger, createPostStatus, openCreateOnMount, hideManagementHeader }: PostsManagerProps) {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>(initialStatus);
   const [loading, setLoading] = useState<boolean>(true);
@@ -156,19 +163,17 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     scheduledAt: '',
     targetPlatform: 'LINKEDIN' as 'LINKEDIN' | 'INSTAGRAM',
   });
-  const [selectedComposerPlatforms, setSelectedComposerPlatforms] = useState<ComposerPlatformId[]>(['LINKEDIN']);
+  const [selectedComposerPlatforms, setSelectedComposerPlatforms] = useState<ComposerPlatformId[]>(userRole === 'ADMIN' ? ['LINKEDIN'] : []);
   const [platformConnections, setPlatformConnections] = useState<Record<ComposerPlatformId, PlatformConnectionStatus>>(INITIAL_PLATFORM_CONNECTIONS);
+  const platformConnectionsRef = useRef(INITIAL_PLATFORM_CONNECTIONS);
   const [schedulePost, setSchedulePost] = useState(false);
   const [attachedMedia, setAttachedMedia] = useState<MediaItem[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [directPublishStatus, setDirectPublishStatus] = useState<'publishing' | 'success' | null>(null);
   const [publishingPostId, setPublishingPostId] = useState<string | null>(null);
-  const [reviewingPost, setReviewingPost] = useState<PostItem | null>(null);
-  const [reviewFeedback, setReviewFeedback] = useState('');
-  const [reviewScheduledAt, setReviewScheduledAt] = useState('');
 
   useEffect(() => {
-    if (userRole !== 'ADMIN') return;
+    if (userRole !== 'ADMIN' && userRole !== 'MANAGER' && userRole !== 'CREATOR') return;
     let active = true;
 
     const checkConnections = async () => {
@@ -186,7 +191,14 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       if (!active) return;
       const nextConnections = { ...INITIAL_PLATFORM_CONNECTIONS };
       for (const result of results) nextConnections[result.id] = result.status;
+      platformConnectionsRef.current = nextConnections;
       setPlatformConnections(nextConnections);
+      if (userRole === 'CREATOR' || userRole === 'MANAGER') {
+        setSelectedComposerPlatforms((current) => {
+          const connected = current.filter((id) => nextConnections[id] === 'connected');
+          return connected.length ? connected : PLATFORM_OPTIONS.filter((platform) => nextConnections[platform.id] === 'connected').slice(0, 1).map((platform) => platform.id);
+        });
+      }
     };
 
     void checkConnections();
@@ -230,11 +242,21 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       scheduledAt: '',
       targetPlatform: 'LINKEDIN',
     });
-    setSelectedComposerPlatforms(['LINKEDIN']);
+    const firstConnectedPlatform = PLATFORM_OPTIONS
+      .filter((platform) => platformConnectionsRef.current[platform.id] === 'connected')
+      .slice(0, 1)
+      .map((platform) => platform.id);
+    setSelectedComposerPlatforms(userRole === 'ADMIN' ? ['LINKEDIN'] : firstConnectedPlatform);
     setSchedulePost(defaultStatus === 'SCHEDULED');
     setAttachedMedia([]);
     setShowCreateModal(true);
-  }, []);
+  }, [userRole]);
+
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    const request = window.setTimeout(() => openCreateModal(createPostStatus ?? 'DRAFT'), 0);
+    return () => window.clearTimeout(request);
+  }, [openCreateOnMount, createPostStatus, openCreateModal]);
 
   useEffect(() => {
     if (createPostTrigger === undefined || createPostTrigger === handledCreatePostTrigger.current) return;
@@ -248,8 +270,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     let schedDate = '';
     if (post.scheduledAt) {
       try {
-        const d = new Date(post.scheduledAt);
-        schedDate = d.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        schedDate = toLocalDateTimeInput(new Date(post.scheduledAt));
       } catch (e) {
         console.error(e);
       }
@@ -285,6 +306,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
       targetPlatform: formData.targetPlatform,
       status: targetStatus,
       scheduledAt: formData.scheduledAt ? new Date(formData.scheduledAt).toISOString() : null,
+      ...(publishImmediately ? { publishImmediately: true } : {}),
     };
 
     try {
@@ -349,7 +371,9 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     if (action !== 'DRAFT') {
       const disconnectedPlatform = selectedPlatforms.find((platform) => platformConnections[platform.id] !== 'connected');
       if (disconnectedPlatform) {
-        setErrorMsg(`Connect your ${disconnectedPlatform.name} account before publishing.`);
+        setErrorMsg(userRole === 'MANAGER'
+          ? `Ask a Workspace Admin to connect the ${disconnectedPlatform.name} account before publishing.`
+          : `Connect your ${disconnectedPlatform.name} account before publishing.`);
         return;
       }
     }
@@ -375,12 +399,13 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
             targetPlatform: platform.targetPlatform,
             status: action === 'DRAFT' ? 'DRAFT' : action === 'SCHEDULE' ? 'SCHEDULED' : 'APPROVED',
             scheduledAt: action === 'SCHEDULE' ? new Date(formData.scheduledAt).toISOString() : null,
+            ...(action === 'PUBLISH' && userRole === 'MANAGER' ? { publishImmediately: true } : {}),
           }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || `Failed to create the ${platform.name} post.`);
 
-        if (action === 'PUBLISH' && platform.publishRoute) {
+        if (action === 'PUBLISH' && userRole !== 'MANAGER' && platform.publishRoute) {
           const publishResponse = await fetch(`/api/posts/${data.post.id}/${platform.publishRoute}`, { method: 'POST' });
           const publishData = await publishResponse.json();
           if (!publishResponse.ok) throw new Error(publishData.error || `Failed to publish to ${platform.name}.`);
@@ -401,6 +426,58 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     } finally {
       setSubmitting(false);
       if (action === 'PUBLISH') setDirectPublishStatus(null);
+    }
+  };
+
+  const handleCreatorComposerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.content.trim()) {
+      setErrorMsg('Post content is required.');
+      return;
+    }
+
+    const selectedPlatforms = PLATFORM_OPTIONS.filter((platform) => selectedComposerPlatforms.includes(platform.id));
+    if (selectedPlatforms.length === 0) {
+      setErrorMsg('Select at least one connected platform.');
+      return;
+    }
+    if (selectedPlatforms.some((platform) => platformConnections[platform.id] !== 'connected')) {
+      setErrorMsg('Only connected platforms can be selected.');
+      return;
+    }
+    if (schedulePost && !formData.scheduledAt) {
+      setErrorMsg('Choose a date and time to schedule this post.');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMsg(null);
+    const mediaIds = attachedMedia.map((media) => media.id);
+    try {
+      for (const platform of selectedPlatforms) {
+        const response = await fetch('/api/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: formData.content.trim(),
+            mediaIds,
+            targetPlatform: platform.targetPlatform,
+            status: 'PENDING_REVIEW',
+            scheduledAt: schedulePost ? new Date(formData.scheduledAt).toISOString() : null,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Failed to submit the ${platform.name} post for review.`);
+      }
+
+      setShowCreateModal(false);
+      setEditingPost(null);
+      setAttachedMedia([]);
+      await fetchPosts();
+    } catch (reason: unknown) {
+      setErrorMsg(reason instanceof Error ? reason.message : 'An error occurred while submitting the post for review.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -440,24 +517,19 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
     }
   };
 
-  const handleReview = async (action: 'APPROVE' | 'REJECT') => {
-    if (!reviewingPost || (action === 'REJECT' && !reviewFeedback.trim())) return;
+  const handleReview = async (action: 'APPROVE' | 'REJECT', post: PostItem) => {
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/posts/${reviewingPost.id}/review`, {
+      const response = await fetch(`/api/posts/${post.id}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          feedback: reviewFeedback,
-          scheduledAt: action === 'APPROVE' && reviewScheduledAt ? new Date(reviewScheduledAt).toISOString() : undefined,
+          feedback: action === 'REJECT' ? 'Rejected by Manager.' : undefined,
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to review post.');
-      setReviewingPost(null);
-      setReviewFeedback('');
-      setReviewScheduledAt('');
       await fetchPosts();
     } catch (reason: unknown) {
       setErrorMsg(reason instanceof Error ? reason.message : 'Failed to review post.');
@@ -477,7 +549,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
         );
       case 'PENDING_REVIEW':
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'rgba(255, 198, 109, 0.12)', color: '#FFC66D', border: '1px solid rgba(255, 198, 109, 0.24)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', backgroundColor: 'rgba(255, 198, 109, 0.12)', color: '#FFC66D', border: '1px solid rgba(255, 198, 109, 0.24)' }}>
             <Clock style={{ width: '12px', height: '12px' }} /> PENDING REVIEW
           </span>
         );
@@ -529,11 +601,15 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
   };
 
   const isAdminCreate = userRole === 'ADMIN' && !editingPost;
+  const isCreatorCreate = userRole === 'CREATOR' && !editingPost;
+  const isManagerCreate = userRole === 'MANAGER' && !editingPost;
+  const isMultiPlatformCreate = isAdminCreate || isCreatorCreate || isManagerCreate;
   const selectedPlatformOptions = PLATFORM_OPTIONS.filter((platform) => selectedComposerPlatforms.includes(platform.id));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Action & Summary Bar */}
+      {userRole !== 'CREATOR' && !hideManagementHeader && (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#FBF5DD', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -542,7 +618,6 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
           </h2>
           <p style={{ color: '#C9C19A', fontSize: '0.88rem', marginTop: '4px' }}>
             Create, view, schedule, and attach media to social posts for your workspace.
-            {userRole === 'CREATOR' && <span style={{ color: '#8BD48A', marginLeft: '6px', fontWeight: 600 }}>(Viewing & managing your posts)</span>}
           </p>
         </div>
 
@@ -560,6 +635,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
           )}
         </div>
       </div>
+      )}
 
       {/* Error Alert */}
       {errorMsg && (
@@ -702,7 +778,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                             title="View Details"
                             aria-label="View post details"
                             className="btn-secondary post-management-icon-action"
-                            style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'transparent', borderColor: 'transparent', color: '#E7E1B1' }}
                           >
                             <Eye style={{ width: '14px', height: '14px' }} />
                           </button>
@@ -710,21 +786,33 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                           {isOwnerOrManage && (
                             <>
                               {post.status === 'PENDING_REVIEW' && (userRole === 'MANAGER' || userRole === 'ADMIN') && (
-                                <button
-                                  onClick={() => {
-                                    setReviewingPost(post);
-                                    setReviewFeedback('');
-                                    setReviewScheduledAt(post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : '');
-                                  }}
-                                  title="Review Post"
-                                  className="btn-primary"
-                                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                                >
-                                  Review
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleReview('APPROVE', post)}
+                                    disabled={submitting}
+                                    title="Approve post"
+                                    aria-label="Approve post"
+                                    className="btn-secondary post-management-icon-action"
+                                    style={{ padding: '6px 8px', background: 'transparent', borderColor: 'transparent', color: '#8BD48A' }}
+                                  >
+                                    <Check aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleReview('REJECT', post)}
+                                    disabled={submitting}
+                                    title="Reject post"
+                                    aria-label="Reject post"
+                                    className="btn-secondary post-management-icon-action"
+                                    style={{ padding: '6px 8px', background: 'transparent', borderColor: 'transparent', color: '#FCA5A5' }}
+                                  >
+                                    <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
+                                  </button>
+                                </>
                               )}
-                              {post.status !== 'PUBLISHED' && post.status !== 'SCHEDULED' && (userRole === 'ADMIN' || userRole === 'CREATOR') &&
-                                ((post.targetPlatform || 'LINKEDIN') !== 'INSTAGRAM' || (userRole === 'ADMIN' && post.status === 'APPROVED')) && (
+                              {post.status !== 'PUBLISHED' && post.status !== 'SCHEDULED' && userRole === 'ADMIN' &&
+                                ((post.targetPlatform || 'LINKEDIN') !== 'INSTAGRAM' || post.status === 'APPROVED') && (
                                 <button
                                   onClick={() => handlePublishPost(post)}
                                   disabled={publishingPostId === post.id}
@@ -742,7 +830,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                                 title="Edit Post"
                                 aria-label="Edit post"
                                 className="btn-secondary post-management-icon-action"
-                                style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)', color: '#E7E1B1' }}
+                                style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'transparent', borderColor: 'transparent', color: '#E7E1B1' }}
                               >
                                 <Edit3 style={{ width: '14px', height: '14px' }} />
                               </button>
@@ -752,7 +840,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                                 title="Delete Post"
                                 aria-label="Delete post"
                                 className="btn-secondary post-management-icon-action"
-                                style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#fca5a5', background: 'rgba(127, 29, 29, 0.18)', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+                                style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#fca5a5', background: 'transparent', borderColor: 'transparent' }}
                               >
                                 <Trash2 style={{ width: '14px', height: '14px' }} />
                               </button>
@@ -771,8 +859,8 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
 
       {/* CREATE / EDIT POST MODAL */}
       {typeof document !== 'undefined' && (showCreateModal || editingPost) && createPortal(
-        <div className={isAdminCreate ? 'post-composer-overlay' : undefined} style={{ position: 'fixed', inset: 0, zIndex: 100, overflow: 'hidden', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div className={`glass-panel animate-fade-in${isAdminCreate ? ' admin-post-composer-dialog' : ''}`} style={{ maxWidth: isAdminCreate ? '760px' : '680px', width: '100%', padding: isAdminCreate ? '24px' : '32px', maxHeight: 'calc(100dvh - 48px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        <div className={isMultiPlatformCreate ? 'post-composer-overlay' : undefined} style={{ position: 'fixed', inset: 0, zIndex: 100, overflow: 'hidden', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div className={`glass-panel animate-fade-in${isMultiPlatformCreate ? ' admin-post-composer-dialog' : ''}`} style={{ maxWidth: isMultiPlatformCreate ? '760px' : '680px', width: '100%', padding: isMultiPlatformCreate ? '24px' : '32px', maxHeight: 'calc(100dvh - 48px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <FileText style={{ color: '#B9E769', width: '22px', height: '22px' }} />
@@ -786,11 +874,11 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
             </div>
 
             <p style={{ fontSize: '0.88rem', color: '#C9C19A', marginBottom: '20px' }}>
-              {isAdminCreate ? 'Create and publish content across your connected social platforms.' : 'Draft a post, attach media, set its status, and schedule it for the right publishing moment.'}
+              {isAdminCreate || isManagerCreate ? 'Create and publish content across your connected social platforms.' : isCreatorCreate ? 'Create content for connected social platforms and submit it for review.' : 'Draft a post, attach media, set its status, and schedule it for the right publishing moment.'}
             </p>
 
-            <form onSubmit={(event) => isAdminCreate ? handleAdminComposerSubmit(event, schedulePost ? 'SCHEDULE' : 'PUBLISH') : handleSubmitPost(event)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {isAdminCreate ? (
+            <form onSubmit={(event) => isAdminCreate || isManagerCreate ? handleAdminComposerSubmit(event, schedulePost ? 'SCHEDULE' : 'PUBLISH') : isCreatorCreate ? handleCreatorComposerSubmit(event) : handleSubmitPost(event)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {isMultiPlatformCreate ? (
                 <>
                   <section>
                     <label className="input-label" style={{ color: '#B9E769', fontWeight: 700 }}>Publish to</label>
@@ -800,8 +888,9 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                         const connection = platformConnections[platform.id];
                         const connectionLabel = connection === 'checking' ? 'Checking' : connection === 'connected' ? 'Connected' : connection === 'unavailable' ? 'Coming soon' : 'Not connected';
                         const connectionColor = connection === 'connected' ? '#8BD48A' : connection === 'disconnected' ? '#E7A4A4' : '#C9C19A';
+                        const disabled = (isCreatorCreate || isManagerCreate) && connection !== 'connected';
                         return (
-                          <label key={platform.id} className={`composer-platform-option${selected ? ' composer-platform-option-selected' : ''}`}>
+                          <label key={platform.id} className={`composer-platform-option${selected ? ' composer-platform-option-selected' : ''}`} style={disabled ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}>
                             {platform.icon}
                             <span className="composer-platform-copy">
                               <span className={`composer-platform-name${selected ? ' composer-platform-name-selected' : ''}`}>{platform.name}</span>
@@ -812,13 +901,14 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                               className="composer-platform-checkbox"
                               aria-label={`Select ${platform.name}`}
                               checked={selected}
+                              disabled={disabled}
                               onChange={() => setSelectedComposerPlatforms((current) => selected ? current.filter((id) => id !== platform.id) : [...current, platform.id])}
                             />
                           </label>
                         );
                       })}
                     </div>
-                    {selectedPlatformOptions.filter((platform) => ['disconnected', 'unavailable'].includes(platformConnections[platform.id])).map((platform) => (
+                    {isAdminCreate && selectedPlatformOptions.filter((platform) => ['disconnected', 'unavailable'].includes(platformConnections[platform.id])).map((platform) => (
                       <div key={platform.id} role="status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', marginTop: '12px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', color: '#E7E1B1', fontSize: '0.84rem' }}>
                           <AlertCircle aria-hidden="true" style={{ width: '15px', height: '15px', flex: '0 0 15px', color: '#E7A4A4' }} />
@@ -945,7 +1035,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                 )}
               </div>
 
-              {isAdminCreate ? (
+              {isMultiPlatformCreate ? (
                 <div className="composer-schedule-row">
                   <label className="composer-schedule-toggle">
                     <input type="checkbox" checked={schedulePost} onChange={(event) => setSchedulePost(event.target.checked)} style={{ width: '17px', height: '17px', accentColor: '#B9E769' }} />
@@ -1001,13 +1091,13 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                 </div>
               )}
 
-              {isAdminCreate && errorMsg && (
+              {isMultiPlatformCreate && errorMsg && (
                 <div role="alert" style={{ padding: '10px 12px', borderRadius: '8px', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.24)', fontSize: '0.84rem' }}>
                   {errorMsg}
                 </div>
               )}
 
-              {isAdminCreate ? (
+              {isAdminCreate || isManagerCreate ? (
                 <div style={{ display: 'flex', gap: '10px', marginTop: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                   <button type="button" onClick={() => { setShowCreateModal(false); setAttachedMedia([]); setErrorMsg(null); }} className="btn-secondary" style={{ color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)' }}>
                     Cancel
@@ -1018,6 +1108,31 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                   <button type="submit" disabled={submitting} className="btn-primary" style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
                     {submitting && schedulePost ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : schedulePost ? <Clock style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
                     {schedulePost ? 'Schedule' : 'Publish'}
+                  </button>
+                </div>
+              ) : isManagerCreate ? (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => { setShowCreateModal(false); setAttachedMedia([]); setErrorMsg(null); }} className="btn-secondary" style={{ color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)' }}>
+                    Cancel
+                  </button>
+                  {formData.status === 'DRAFT' && (
+                    <button type="button" onClick={(event) => handleAdminComposerSubmit(event, 'DRAFT')} disabled={submitting} className="btn-secondary" style={{ color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.35)' }}>
+                      <Save style={{ width: '16px', height: '16px' }} /> Save as Draft
+                    </button>
+                  )}
+                  <button type="submit" disabled={submitting} className="btn-primary" style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
+                    {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : schedulePost ? <Clock style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
+                    {schedulePost ? 'Schedule' : 'Publish'}
+                  </button>
+                </div>
+              ) : isCreatorCreate ? (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => { setShowCreateModal(false); setAttachedMedia([]); setErrorMsg(null); }} className="btn-secondary" style={{ color: '#E7E1B1', background: 'rgba(48, 109, 41, 0.12)', borderColor: 'rgba(185, 231, 105, 0.28)' }}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={submitting} className="btn-primary" style={{ background: 'linear-gradient(135deg, #306D29 0%, #0D530E 100%)' }}>
+                    {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
+                    Submit for Review
                   </button>
                 </div>
               ) : (
@@ -1053,7 +1168,7 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                     </button>
                   )}
 
-                  <button
+                  {userRole !== 'CREATOR' && <button
                     type="submit"
                     disabled={submitting}
                     className="btn-primary"
@@ -1068,9 +1183,9 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                     ) : (
                       'Publish / Schedule Post'
                     )}
-                  </button>
+                  </button>}
 
-                  <button
+                  {userRole === 'ADMIN' && <button
                     type="button"
                     onClick={(event) => handleSubmitPost(event, editingPost ? formData.status : 'DRAFT', true)}
                     disabled={submitting}
@@ -1078,12 +1193,12 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
                   >
                     {submitting ? <Loader2 className="animate-spin" style={{ width: '16px', height: '16px' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
                     Publish to {formData.targetPlatform === 'INSTAGRAM' ? 'Instagram' : 'LinkedIn'}
-                  </button>
+                  </button>}
                 </div>
               )}
             </form>
           </div>
-          {isAdminCreate && directPublishStatus && (
+          {(isAdminCreate || isManagerCreate) && directPublishStatus && (
             <div className="direct-publish-status-overlay" role="status" aria-live="polite">
               <div className={`direct-publish-status-content${directPublishStatus === 'success' ? ' direct-publish-status-success' : ''}`}>
                 <div className="direct-publish-status-icon">
@@ -1101,24 +1216,6 @@ export default function PostsManager({ userRole, currentUserId, initialStatus = 
           )}
         </div>
       , document.body)}
-
-      {reviewingPost && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div className="glass-panel" style={{ maxWidth: '520px', width: '100%', padding: '28px' }}>
-            <h3 style={{ color: '#B9E769', marginBottom: '12px' }}>Review Submission</h3>
-            <p style={{ color: '#C9C19A', whiteSpace: 'pre-wrap', marginBottom: '18px' }}>{reviewingPost.content}</p>
-            <label className="input-label" style={{ color: '#B9E769' }}>Feedback (required when rejecting)</label>
-            <textarea className="input-field" rows={4} value={reviewFeedback} onChange={(e) => setReviewFeedback(e.target.value)} placeholder="Tell the creator what to change..." />
-            <label className="input-label" style={{ color: '#B9E769', marginTop: '14px' }}>Schedule after approval (optional)</label>
-            <input className="input-field" type="datetime-local" value={reviewScheduledAt} onChange={(e) => setReviewScheduledAt(e.target.value)} min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
-              <button className="btn-secondary" onClick={() => setReviewingPost(null)}>Cancel</button>
-              <button className="btn-secondary" onClick={() => handleReview('REJECT')} disabled={submitting || !reviewFeedback.trim()} style={{ color: '#fca5a5' }}>Reject</button>
-              <button className="btn-primary" onClick={() => handleReview('APPROVE')} disabled={submitting}>Approve</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MEDIA SELECTOR MODAL */}
       {typeof document !== 'undefined' && showMediaSelectorModal && createPortal(

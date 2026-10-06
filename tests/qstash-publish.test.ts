@@ -75,6 +75,7 @@ describe('QStash publish route', () => {
       workspaceId: 'workspace-1',
       content: 'Hello world',
       mediaIds: ['media-1'],
+      targetPlatform: 'LINKEDIN',
       status: 'SCHEDULED',
       scheduledAt: new Date('2026-01-01T00:00:00Z'),
       publishing: undefined,
@@ -89,7 +90,7 @@ describe('QStash publish route', () => {
       new NextRequest('http://localhost:3000/api/publish', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'upstash-signature': 'valid-signature' },
-        body: JSON.stringify({ postId: 'post-1' }),
+        body: JSON.stringify({ postId: 'post-1', scheduledAt: post.scheduledAt.toISOString() }),
       })
     );
 
@@ -99,7 +100,103 @@ describe('QStash publish route', () => {
       'workspace-account-id',
       expect.stringContaining('Hello world')
     );
+    expect(mocks.publishLinkedInTextPost).toHaveBeenCalledWith(
+      'linkedin-token',
+      'workspace-account-id',
+      expect.stringContaining('https://cdn.example.com/image.png')
+    );
     expect(save).toHaveBeenCalledTimes(1);
     expect(post.status).toBe('PUBLISHED');
+  });
+
+  it('publishes an approved unscheduled post from the immediate queue', async () => {
+    const save = vi.fn(async function save(this: { status: string; publishedAt?: Date; publishing?: unknown }) {
+      this.status = 'PUBLISHED';
+      this.publishedAt = new Date('2026-01-02');
+      this.publishing = { platform: 'LINKEDIN', externalPostId: 'linkedin-123', publishedAt: new Date('2026-01-02') };
+      return this;
+    });
+    const post = {
+      _id: 'post-2',
+      workspaceId: 'workspace-1',
+      content: 'Approved now',
+      mediaIds: [],
+      status: 'APPROVED',
+      scheduledAt: null,
+      publishing: undefined,
+      save,
+    };
+    mocks.postFindOne.mockResolvedValue(post);
+    mocks.mediaFind.mockResolvedValue([]);
+    mocks.publishLinkedInTextPost.mockResolvedValue('linkedin-123');
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/publish', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'upstash-signature': 'valid-signature' },
+        body: JSON.stringify({ postId: 'post-2' }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.publishLinkedInTextPost).toHaveBeenCalledWith('linkedin-token', 'workspace-account-id', 'Approved now');
+    expect(post.status).toBe('PUBLISHED');
+  });
+
+  it('ignores a scheduled delivery after the post schedule has changed', async () => {
+    const post = {
+      _id: 'post-3',
+      workspaceId: 'workspace-1',
+      content: 'Updated schedule',
+      mediaIds: [],
+      targetPlatform: 'LINKEDIN',
+      status: 'SCHEDULED',
+      scheduledAt: new Date(Date.now() + 5 * 60_000),
+      publishing: undefined,
+      save: vi.fn(),
+    };
+    mocks.postFindOne.mockResolvedValue(post);
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/publish', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'upstash-signature': 'valid-signature' },
+        body: JSON.stringify({ postId: 'post-3', scheduledAt: new Date(Date.now() + 60_000).toISOString() }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.message).toContain('outdated');
+    expect(mocks.socialAccountFindOne).not.toHaveBeenCalled();
+    expect(mocks.publishLinkedInTextPost).not.toHaveBeenCalled();
+  });
+
+  it('ignores a scheduled LinkedIn delivery after the post moves to another platform', async () => {
+    const post = {
+      _id: 'post-4',
+      workspaceId: 'workspace-1',
+      content: 'Instagram content',
+      mediaIds: [],
+      targetPlatform: 'INSTAGRAM',
+      status: 'SCHEDULED',
+      scheduledAt: new Date(Date.now() + 5 * 60_000),
+      publishing: undefined,
+      save: vi.fn(),
+    };
+    mocks.postFindOne.mockResolvedValue(post);
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/publish', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'upstash-signature': 'valid-signature' },
+        body: JSON.stringify({ postId: 'post-4', scheduledAt: post.scheduledAt.toISOString() }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.message).toContain('outdated');
+    expect(mocks.publishLinkedInTextPost).not.toHaveBeenCalled();
   });
 });

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid QStash signature.' }, { status: 401 });
   }
 
-  let payload: { postId?: string };
+  let payload: { postId?: string; scheduledAt?: string };
   try {
     payload = JSON.parse(body) as { postId?: string };
   } catch {
@@ -69,12 +69,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
     }
 
+    if ((post.targetPlatform || 'LINKEDIN') !== 'LINKEDIN') {
+      return NextResponse.json({ message: 'Ignored an outdated LinkedIn schedule delivery.' }, { status: 200 });
+    }
+
+    if (payload.scheduledAt) {
+      const messageSchedule = new Date(payload.scheduledAt).getTime();
+      if (
+        post.status !== 'SCHEDULED' ||
+        !post.scheduledAt ||
+        !Number.isFinite(messageSchedule) ||
+        messageSchedule !== post.scheduledAt.getTime()
+      ) {
+        return NextResponse.json({ message: 'Ignored an outdated LinkedIn schedule delivery.' }, { status: 200 });
+      }
+    }
+    if (post.status === 'SCHEDULED' && post.scheduledAt && post.scheduledAt.getTime() > Date.now() + 1_000) {
+      return NextResponse.json({ message: 'Ignored a LinkedIn schedule delivery before the current scheduled time.' }, { status: 200 });
+    }
+
     if (post.status === 'PUBLISHED' && post.publishing?.externalPostId) {
       return NextResponse.json({ message: 'Post was already published.', postId: post.publishing.externalPostId }, { status: 200 });
     }
 
-    if (post.status !== 'SCHEDULED') {
-      return NextResponse.json({ error: 'Post is not in a scheduled state.' }, { status: 409 });
+    if (post.status !== 'SCHEDULED' && post.status !== 'APPROVED') {
+      return NextResponse.json({ error: 'Post is not approved for publishing.' }, { status: 409 });
     }
 
     const account = await SocialAccount.findOne({ workspaceId: post.workspaceId, platform: 'LINKEDIN' }).select('+encryptedAccessToken');

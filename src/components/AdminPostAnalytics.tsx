@@ -11,6 +11,7 @@ import {
   YAxis,
 } from 'recharts';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileText, PenLine, type LucideIcon } from 'lucide-react';
+import { FacebookBrandMark, InstagramBrandMark, LinkedInBrandMark } from '@/components/SocialAccountsPanel';
 
 type Period = 'week' | 'month' | 'upcoming';
 type ChartDay = { date: string; count: number };
@@ -458,16 +459,15 @@ export default function AdminPostAnalytics({ members }: { members: TeamMember[] 
       <div className="admin-overview-details">
         <section aria-labelledby="admin-team-overview-title" style={{ padding: '18px 0', borderBottom: '1px solid rgba(231, 225, 177, 0.16)' }}>
           <h2 id="admin-team-overview-title" style={{ margin: '0 0 14px', color: '#FBF5DD', fontSize: '1.05rem', fontWeight: 700 }}>Team Overview</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {[
-              { label: 'Total', value: members.length, color: '#FBF5DD' },
               { label: 'Admins', value: members.filter((member) => member.role === 'ADMIN').length, color: '#8BD48A' },
               { label: 'Managers', value: members.filter((member) => member.role === 'MANAGER').length, color: '#78C8FF' },
               { label: 'Creators', value: members.filter((member) => member.role === 'CREATOR').length, color: '#FFC66D' },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ color: '#C9C19A', fontSize: '0.78rem', fontWeight: 600 }}>{label}</span>
-                <span style={{ color, fontSize: '1.3rem', fontWeight: 750 }}>{value.toLocaleString()}</span>
+            ].map(({ label, value, color }, index, roles) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '42px', padding: '9px 0', borderBottom: index < roles.length - 1 ? '1px solid rgba(231, 225, 177, 0.1)' : 'none' }}>
+                <span style={{ color: '#C9C19A', fontSize: '0.82rem', fontWeight: 600 }}>{label}</span>
+                <span style={{ color, fontSize: '1.1rem', fontWeight: 750 }}>{value.toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -475,18 +475,24 @@ export default function AdminPostAnalytics({ members }: { members: TeamMember[] 
 
         <section aria-labelledby="admin-social-accounts-title" style={{ padding: '18px 0', borderBottom: '1px solid rgba(231, 225, 177, 0.16)' }}>
           <h2 id="admin-social-accounts-title" style={{ margin: '0 0 14px', color: '#FBF5DD', fontSize: '1.05rem', fontWeight: 700 }}>Social Accounts</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {[
-              { name: 'LinkedIn', connected: linkedinConnected },
-              { name: 'Instagram', connected: instagramConnected },
-              { name: 'Facebook', connected: false },
-            ].map(({ name, connected }) => {
+              { name: 'LinkedIn', icon: LinkedInBrandMark, connected: linkedinConnected },
+              { name: 'Instagram', icon: InstagramBrandMark, connected: instagramConnected },
+              { name: 'Facebook', icon: FacebookBrandMark, connected: false },
+            ].map(({ name, icon: BrandMark, connected }, index, accounts) => {
               const status = connected === null ? 'Checking status' : connected ? 'Connected' : 'Disconnected';
               const dotColor = connected === null ? '#C9C19A' : connected ? '#8BD48A' : '#F87171';
               return (
-                <div key={name} aria-label={`${name}: ${status}`} title={status} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FBF5DD', fontSize: '0.88rem', fontWeight: 600 }}>
-                  <span aria-hidden="true" style={{ width: '9px', height: '9px', flex: '0 0 9px', borderRadius: '50%', background: dotColor, boxShadow: connected === null ? 'none' : `0 0 8px ${dotColor}66` }} />
-                  {name}
+                <div key={name} role="group" aria-label={`${name}: ${status}`} title={status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', minHeight: '42px', padding: '9px 0', borderBottom: index < accounts.length - 1 ? '1px solid rgba(231, 225, 177, 0.1)' : 'none' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#FBF5DD', fontSize: '0.88rem', fontWeight: 600 }}>
+                    <span aria-hidden="true"><BrandMark size={18} /></span>
+                    {name}
+                  </span>
+                  <span style={{ display: 'grid', gridTemplateColumns: '9px minmax(0, 1fr)', alignItems: 'center', columnGap: '8px', width: '117px', color: connected === true ? '#8BD48A' : '#C9C19A', fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    <span aria-hidden="true" style={{ width: '9px', height: '9px', flex: '0 0 9px', borderRadius: '50%', background: dotColor, boxShadow: connected === null ? 'none' : `0 0 8px ${dotColor}66` }} />
+                    <span>{status}</span>
+                  </span>
                 </div>
               );
             })}

@@ -55,13 +55,21 @@ export async function POST(req: NextRequest) {
     const post = await Post.findOne({ _id: payload.postId });
     if (!post) return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
     if ((post.targetPlatform || 'LINKEDIN') !== 'INSTAGRAM') {
-      return NextResponse.json({ error: 'This post is not targeted to Instagram.' }, { status: 409 });
+      return NextResponse.json({ message: 'Ignored an outdated Instagram schedule delivery.' });
     }
-    if (payload.scheduledAt && post.scheduledAt) {
+    if (payload.scheduledAt) {
       const messageSchedule = new Date(payload.scheduledAt).getTime();
-      if (!Number.isFinite(messageSchedule) || messageSchedule !== post.scheduledAt.getTime()) {
+      if (
+        !post.scheduledAt ||
+        !Number.isFinite(messageSchedule) ||
+        messageSchedule !== post.scheduledAt.getTime() ||
+        !['SCHEDULED', 'PROCESSING'].includes(post.status)
+      ) {
         return NextResponse.json({ message: 'Ignored an outdated Instagram schedule delivery.' });
       }
+    }
+    if (payload.containerId && payload.containerId !== post.publishing?.containerId) {
+      return NextResponse.json({ message: 'Ignored an outdated Instagram container delivery.' });
     }
     if (post.status === 'PUBLISHED' && post.publishing?.externalPostId) {
       return NextResponse.json({ message: 'Post was already published.', postId: post.publishing.externalPostId });
@@ -71,6 +79,8 @@ export async function POST(req: NextRequest) {
     let claimFilter: Record<string, unknown>;
     if (post.status === 'SCHEDULED') {
       claimFilter = { status: 'SCHEDULED' };
+    } else if (post.status === 'APPROVED') {
+      claimFilter = { status: 'APPROVED' };
     } else if (post.status === 'PROCESSING') {
       const leaseStartedAt = post.publishing?.startedAt || post.updatedAt;
       const leaseExpiresAt = new Date(leaseStartedAt.getTime() + INSTAGRAM_PROCESSING_LEASE_MS);

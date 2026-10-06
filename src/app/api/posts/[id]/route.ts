@@ -5,7 +5,8 @@ import Post, { PostStatus } from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
 import User from '@/models/User';
 import Media from '@/models/Media';
-import { schedulePost } from '@/lib/qstash';
+import SocialAccount from '@/models/SocialAccount';
+import { publishPostImmediately, schedulePost } from '@/lib/qstash';
 
 const VALID_STATUSES: PostStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SCHEDULED', 'QUEUED', 'PROCESSING', 'PUBLISHED', 'FAILED'];
 
@@ -140,10 +141,20 @@ export async function PATCH(
     if (currentMember.role === 'CREATOR' && post.createdBy.toString() !== userId) {
       return NextResponse.json({ error: 'Forbidden: Creators can only edit their own posts.' }, { status: 403 });
     }
+    if (post.status === 'PROCESSING') {
+      return NextResponse.json({ error: 'This post is currently being published and cannot be edited.' }, { status: 409 });
+    }
 
+    const originalPostData = {
+      content: post.content,
+      targetPlatform: post.targetPlatform,
+      mediaIds: post.mediaIds.map((mediaId) => mediaId.toString()),
+      scheduledAt: post.scheduledAt?.getTime() ?? null,
+      status: post.status,
+    };
     const body = await req.json();
-    const { content, mediaIds, platform, targetPlatform, status, scheduledAt, publishedAt } = body;
-    const shouldSchedule = status?.toUpperCase() === 'SCHEDULED' || scheduledAt !== undefined;
+    const { content, mediaIds, platform, targetPlatform, status, scheduledAt, publishedAt, publishImmediately } = body;
+    const shouldSchedule = status?.toUpperCase() === 'SCHEDULED' || scheduledAt !== undefined || targetPlatform !== undefined;
 
     if (content !== undefined) {
       if (typeof content !== 'string' || !content.trim()) {
@@ -160,6 +171,12 @@ export async function PATCH(
         return NextResponse.json({ error: 'Invalid target platform.' }, { status: 400 });
       }
       post.targetPlatform = targetPlatform;
+    }
+    if (currentMember.role === 'CREATOR') {
+      const account = await SocialAccount.findOne({ workspaceId: currentMember.workspaceId, platform: post.targetPlatform }).select('status');
+      if (account?.status !== 'CONNECTED') {
+        return NextResponse.json({ error: 'Creators can submit posts only to connected social platforms.' }, { status: 403 });
+      }
     }
     if (Array.isArray(mediaIds)) {
       const cleanMediaIds = mediaIds.filter((mId) => typeof mId === 'string' && mId.trim());
@@ -187,7 +204,7 @@ export async function PATCH(
       if (currentMember.role === 'CREATOR' && !['DRAFT', 'PENDING_REVIEW'].includes(upperStatus)) {
         return NextResponse.json({ error: 'Creators can only save drafts or submit posts for review.' }, { status: 403 });
       }
-      if (currentMember.role === 'CREATOR' && upperStatus === 'PENDING_REVIEW' && !['DRAFT', 'REJECTED'].includes(post.status)) {
+      if (currentMember.role === 'CREATOR' && upperStatus === 'PENDING_REVIEW' && !['DRAFT', 'REJECTED', 'PENDING_REVIEW'].includes(post.status)) {
         return NextResponse.json({ error: 'Only drafts and rejected posts can be submitted for review.' }, { status: 409 });
       }
       if (currentMember.role === 'MANAGER' && ['PUBLISHED', 'PROCESSING', 'FAILED'].includes(upperStatus)) {
@@ -195,8 +212,9 @@ export async function PATCH(
       }
       const isInstagramScheduleRetry = currentMember.role === 'ADMIN' &&
         post.targetPlatform === 'INSTAGRAM' && post.status === 'FAILED' && upperStatus === 'SCHEDULED';
+      const isRescheduling = post.status === 'SCHEDULED' && upperStatus === 'SCHEDULED';
       if ((currentMember.role === 'MANAGER' || currentMember.role === 'ADMIN') &&
-        upperStatus === 'SCHEDULED' && post.status !== 'APPROVED' && !isInstagramScheduleRetry) {
+        upperStatus === 'SCHEDULED' && post.status !== 'APPROVED' && !isInstagramScheduleRetry && !isRescheduling) {
         return NextResponse.json({ error: 'Only approved posts can be scheduled.' }, { status: 409 });
       }
       post.status = upperStatus;
@@ -215,14 +233,21 @@ export async function PATCH(
         post.scheduledAt = null;
       } else {
         const d = new Date(scheduledAt);
-        if (!isNaN(d.getTime())) {
-          post.scheduledAt = d;
-        }
+        if (isNaN(d.getTime())) return NextResponse.json({ error: 'Scheduled time must be a valid date.' }, { status: 400 });
+        post.scheduledAt = d;
       }
     }
 
-    if (post.status === 'SCHEDULED' && (!post.scheduledAt || post.scheduledAt.getTime() <= Date.now())) {
-      return NextResponse.json({ error: 'A scheduled post must have a future scheduledAt value.' }, { status: 400 });
+    if (post.status === 'SCHEDULED' && !post.scheduledAt) {
+      return NextResponse.json({ error: 'A scheduled post must have a scheduledAt value.' }, { status: 400 });
+    }
+    if (
+      post.status === 'SCHEDULED' &&
+      post.scheduledAt &&
+      post.scheduledAt.getTime() <= Date.now() &&
+      post.scheduledAt.getTime() !== originalPostData.scheduledAt
+    ) {
+      return NextResponse.json({ error: 'A new scheduled time must be in the future.' }, { status: 400 });
     }
 
     if (publishedAt !== undefined) {
@@ -236,11 +261,24 @@ export async function PATCH(
       }
     }
 
+    const postDataChanged = originalPostData.content !== post.content ||
+      originalPostData.targetPlatform !== post.targetPlatform ||
+      originalPostData.scheduledAt !== (post.scheduledAt?.getTime() ?? null) ||
+      originalPostData.mediaIds.length !== post.mediaIds.length ||
+      originalPostData.mediaIds.some((mediaId, index) => mediaId !== post.mediaIds[index]?.toString());
+    if (post.status === 'SCHEDULED' && postDataChanged) {
+      post.publishing = { platform: post.targetPlatform || 'LINKEDIN' };
+    }
+
     await post.save();
 
     if (shouldSchedule && post.status === 'SCHEDULED' && post.scheduledAt) {
       try {
-        await schedulePost(post._id.toString(), post.scheduledAt, post.targetPlatform || 'LINKEDIN');
+        if (post.scheduledAt.getTime() <= Date.now()) {
+          await publishPostImmediately(post._id.toString(), post.targetPlatform || 'LINKEDIN');
+        } else {
+          await schedulePost(post._id.toString(), post.scheduledAt, post.targetPlatform || 'LINKEDIN');
+        }
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'Failed to schedule post.';
         post.status = 'FAILED';
@@ -250,6 +288,23 @@ export async function PATCH(
         };
         await post.save();
         return NextResponse.json({ error: `Post was updated but could not be scheduled: ${reason}`, details: reason }, { status: 502 });
+      }
+    } else if (
+      post.status === 'APPROVED' &&
+      (originalPostData.status === 'SCHEDULED' || originalPostData.targetPlatform !== post.targetPlatform) &&
+      !(currentMember.role === 'ADMIN' && publishImmediately === true)
+    ) {
+      try {
+        await publishPostImmediately(post._id.toString(), post.targetPlatform || 'LINKEDIN');
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Failed to queue the updated post for publishing.';
+        post.status = 'FAILED';
+        post.publishing = {
+          platform: post.targetPlatform || 'LINKEDIN',
+          error: reason,
+        };
+        await post.save();
+        return NextResponse.json({ error: `Post was updated but could not be queued for publishing: ${reason}`, details: reason }, { status: 502 });
       }
     }
 

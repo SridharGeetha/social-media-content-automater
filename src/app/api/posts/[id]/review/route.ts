@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import connectToDatabase from '@/lib/db';
 import Post from '@/models/Post';
 import WorkspaceMember from '@/models/WorkspaceMember';
-import { schedulePost } from '@/lib/qstash';
+import { publishPostImmediately, schedulePost } from '@/lib/qstash';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     let parsedScheduledAt: Date | null = null;
-    const requestedSchedule = action === 'APPROVE' && scheduledAt ? scheduledAt : post.scheduledAt;
+    const requestedSchedule = action === 'APPROVE' && !post.scheduledAt && scheduledAt ? scheduledAt : post.scheduledAt;
     if (action === 'APPROVE' && requestedSchedule) {
       const candidate = new Date(requestedSchedule);
       if (Number.isNaN(candidate.getTime()) || candidate.getTime() <= Date.now()) {
@@ -62,6 +62,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         };
         await post.save();
         return NextResponse.json({ error: `Post was approved but could not be scheduled: ${reason}`, details: reason }, { status: 502 });
+      }
+    } else if (post.status === 'APPROVED') {
+      try {
+        await publishPostImmediately(post._id.toString(), post.targetPlatform || 'LINKEDIN');
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Failed to queue approved post for publishing.';
+        post.status = 'FAILED';
+        post.publishing = {
+          platform: post.targetPlatform || 'LINKEDIN',
+          error: reason,
+        };
+        await post.save();
+        return NextResponse.json({ error: `Post was approved but could not be queued for publishing: ${reason}`, details: reason }, { status: 502 });
       }
     }
 
