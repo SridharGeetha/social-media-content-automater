@@ -148,3 +148,212 @@ a.secondary {
   padding: 0.1em 0.4em;
   border-radius: 6px;
 }
+
+.heroSection {
+  width: 100%;
+  min-height: 620px;
+  display: flex;
+  align-items: center;
+  padding: 68px max(24px, calc((100vw - 1200px) / 2));
+  text-align: left;
+  background-color: #030a06;
+  background-image:
+    linear-gradient(90deg, #030a06 0%, rgba(3, 10, 6, 0.96) 31%, rgba(3, 10, 6, 0.82) 45%, rgba(3, 10, 6, 0.38) 68%, rgba(3, 10, 6, 0.08) 100%),
+    linear-gradient(0deg, rgba(3, 10, 6, 0.34), rgba(3, 10, 6, 0.08)),
+    url('/hero-workflow-background.webp');
+  background-position: center, center, center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.heroIntro {
+  max-width: 560px;
+}
+
+.heroTitle {
+  max-width: 560px;
+  margin: 0;
+  color: #fbf5dd;
+  font-family: var(--font-heading);
+  font-size: 3.25rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.heroTitle span {
+  color: #b9e769;
+}
+
+.heroDescription {
+  max-width: 540px;
+  margin: 20px 0 28px;
+  color: #c9c19a;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  text-wrap: balance;
+}
+
+.heroActions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.heroPrimaryAction,
+.heroSecondaryAction {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.heroPrimaryAction {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.heroPrimaryAction:hover {
+  background: var(--accent-primary-hover);
+  transform: translateY(-1px);
+}
+
+.heroSecondaryAction {
+  border-color: rgba(231, 225, 177, 0.34);
+  color: #fbf5dd;
+}
+
+.heroSecondaryAction:hover {
+  border-color: rgba(231, 225, 177, 0.7);
+  background: rgba(231, 225, 177, 0.08);
+}
+
+.heroPrimaryAction:focus-visible,
+.heroSecondaryAction:focus-visible {
+  outline: 2px solid #b9e769;
+  outline-offset: 3px;
+}
+
+.heroAssurance {
+  margin: 15px 0 30px;
+  color: #8c8a78;
+  font-size: 0.8rem;
+}
+
+.platforms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.platformsLabel {
+  color: #c9c19a;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.platformList {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.platformItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #fbf5dd;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.platformIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(185, 231, 105, 0.28);
+  border-radius: 50%;
+  background: rgba(48, 109, 41, 0.18);
+  color: #b9e769;
+}
+
+.platformIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.linkedinIcon {
+  font-family: Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+@media (max-width: 760px) {
+  .heroSection {
+    min-height: 600px;
+    padding: 54px 20px 48px;
+    background-image:
+      linear-gradient(90deg, rgba(3, 10, 6, 0.95), rgba(3, 10, 6, 0.85)),
+      linear-gradient(0deg, rgba(3, 10, 6, 0.48), rgba(3, 10, 6, 0.28)),
+      url('/hero-workflow-background.webp');
+    background-position: center, center, 62% center;
+    background-size: cover, cover, cover;
+  }
+
+  .heroTitle {
+    font-size: 2.5rem;
+  }
+
+  .heroDescription {
+    max-width: 560px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .heroSection {
+    min-height: 560px;
+    padding: 44px 16px 40px;
+  }
+
+  .heroTitle {
+    font-size: 2rem;
+  }
+
+  .heroDescription {
+    margin-top: 16px;
+    margin-bottom: 24px;
+    font-size: 0.94rem;
+  }
+
+  .heroActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .heroPrimaryAction,
+  .heroSecondaryAction {
+    width: 100%;
+  }
+
+  .heroAssurance {
+    max-width: 260px;
+    margin: 14px 0 26px;
+  }
+}
