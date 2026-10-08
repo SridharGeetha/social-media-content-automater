@@ -149,6 +149,22 @@ a.secondary {
   border-radius: 6px;
 }
 
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(185, 231, 105, 0.18);
+  background: linear-gradient(
+    to top,
+    rgba(48, 109, 41, 0.42) 0%,
+    rgba(13, 35, 17, 0.94) 78%,
+    rgba(3, 10, 6, 0.98) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
 .heroSection {
   width: 100%;
   min-height: 620px;
@@ -171,11 +187,11 @@ a.secondary {
 }
 
 .heroTitle {
-  max-width: 560px;
+  max-width: 600px;
   margin: 0;
   color: #fbf5dd;
   font-family: var(--font-heading);
-  font-size: 3.25rem;
+  font-size: 2.5rem;
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.12;
@@ -184,6 +200,11 @@ a.secondary {
 
 .heroTitle span {
   color: #b9e769;
+}
+
+.heroTitle .heroTitleLead {
+  display: block;
+  color: inherit;
 }
 
 .heroDescription {
@@ -317,7 +338,7 @@ a.secondary {
   }
 
   .heroTitle {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
 
   .heroDescription {
@@ -333,7 +354,7 @@ a.secondary {
   }
 
   .heroTitle {
-    font-size: 2rem;
+    font-size: 1.6rem;
   }
 
   .heroDescription {

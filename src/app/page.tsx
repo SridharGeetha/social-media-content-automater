@@ -19,17 +19,7 @@ export default async function LandingPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header / Navbar */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        }}
-      >
+      <header className={styles.navbar}>
         <div
           style={{
             maxWidth: '1200px',
@@ -54,7 +44,7 @@ export default async function LandingPage() {
               </Link>
             ) : (
               <>
-                <Link href="/login" className="btn-secondary" style={{ padding: '8px 18px', fontSize: '0.9rem' }}>
+                <Link href="/login" className="btn-primary" style={{ padding: '8px 18px', fontSize: '0.9rem' }}>
                   Sign In
                 </Link>
                 <Link href="/register" className="btn-primary" style={{ padding: '8px 18px', fontSize: '0.9rem' }}>
@@ -71,7 +61,8 @@ export default async function LandingPage() {
       <section className={`${styles.heroSection} animate-fade-in`}>
         <div className={styles.heroIntro}>
           <h1 className={styles.heroTitle}>
-            Plan, create, and publish <span>social content together.</span>
+            <span className={styles.heroTitleLead}>Plan, create, and publish</span>
+            <span>social content together.</span>
           </h1>
 
           <p className={styles.heroDescription}>
@@ -106,6 +97,9 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      <footer style={{ marginTop: 'auto', borderTop: '1px solid rgba(255, 255, 255, 0.08)', padding: '8px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
+        © 2026 Social Media Content Automater.
+      </footer>
     </div>
   );
 }
